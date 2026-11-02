@@ -1,0 +1,4 @@
+tools/comments.json
+tools/config.json
+*.tmp
+__pycache__/
