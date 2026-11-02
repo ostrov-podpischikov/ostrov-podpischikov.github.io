@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Остров подписчиков — найди свой дом</title>
+  <meta name="description" content="Воксельный остров, который строят подписчики @ostrov.podpischikov. Найди свой дом по нику." />
+  <meta property="og:title" content="Остров подписчиков 🏝" />
+  <meta property="og:description" content="Найди свой дом по нику и получи паспорт жителя" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="island.js?v=3"></script>
+  <style>
+    :root {
+      --panel: rgba(13, 24, 38, 0.92);
+      --panel-solid: #0d1826;
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #ffffff;
+      --muted: rgba(255, 255, 255, 0.6);
+      --accent: #f4d35e;
+      --accent-ink: #1d1a0c;
+      --teal: #2ec4b6;
+      --sky: #8fd6f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: var(--sky); font-family: "Montserrat", system-ui, sans-serif; color: var(--text); }
+    button { font-family: inherit; }
+    #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+    #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .tag {
+      position: absolute; left: 0; top: 0; padding: 3px 8px 4px; border-radius: 10px; background: rgba(255, 255, 255, 0.94);
+      color: #0b3954; font-size: 11px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 rgba(11, 57, 84, 0.25); will-change: transform;
+    }
+    .tag.me { background: var(--accent); color: var(--accent-ink); font-size: 14px; padding: 5px 12px 6px; z-index: 2; }
+    .tag.home { background: var(--accent); color: var(--accent-ink); }
+
+    header { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); z-index: 5; display: grid; gap: 8px; }
+    .panel { background: var(--panel); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+    .search { position: relative; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 52px; }
+    .search .ico { font-size: 18px; opacity: 0.9; }
+    .search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font: 700 16px "Montserrat", sans-serif; outline: none; }
+    .search input::placeholder { color: var(--muted); }
+    .search .clear { border: 0; background: none; color: var(--muted); font-size: 22px; cursor: pointer; display: none; }
+    .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: none; z-index: 6; }
+    .suggest button { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; background: none; color: var(--text); padding: 12px 16px; font: 700 15px "Montserrat", sans-serif; cursor: pointer; text-align: left; }
+    .suggest button + button { border-top: 1px solid var(--line); }
+    .suggest button:hover, .suggest button:focus { background: rgba(255, 255, 255, 0.06); outline: none; }
+    .suggest small { color: var(--muted); font-weight: 600; font-size: 12px; }
+
+    .stats { padding: 10px 14px 12px; }
+    .stats .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+    .stats .row b { color: var(--accent); font-weight: 900; }
+    .stats .row .dot { color: var(--muted); margin: 0 6px; }
+    .progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--muted); }
+    .bar { flex: 1; height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 6px; transition: width 0.8s; }
+    .link { border: 0; background: none; color: var(--accent); font: 800 12px "Montserrat", sans-serif; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+
+    #sheet { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); z-index: 5; padding: 16px; display: none; }
+    #sheet .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    #sheet .nick { font-size: 22px; font-weight: 900; word-break: break-all; line-height: 1.15; }
+    .badge { display: inline-block; margin-top: 6px; padding: 4px 10px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 900; letter-spacing: 0.5px; }
+    .x { border: 0; background: rgba(255, 255, 255, 0.08); color: var(--text); width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; flex: none; }
+    .fields { margin-top: 12px; display: grid; gap: 7px; }
+    .fields div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 700; }
+    .fields span:first-child { color: var(--muted); font-weight: 600; }
+    .fields span:last-child { text-align: right; }
+    .actions { display: flex; gap: 8px; margin-top: 14px; }
+    .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 12px; padding: 13px 12px; font: 800 14px "Montserrat", sans-serif; cursor: pointer; text-decoration: none; }
+    .btn.yellow { background: var(--accent); color: var(--accent-ink); }
+    .btn.dark { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+    .btn.full { margin-top: 8px; width: 100%; }
+    #sheet p { margin-top: 10px; font-size: 14px; font-weight: 600; line-height: 1.45; color: rgba(255, 255, 255, 0.85); }
+
+    .modal { position: fixed; inset: 0; z-index: 10; background: rgba(5, 10, 18, 0.7); display: none; align-items: center; justify-content: center; padding: 16px; }
+    .modal .box { width: min(420px, 100%); max-height: 100%; overflow: auto; padding: 16px; }
+    .modal img { width: 100%; border-radius: 14px; display: block; }
+    .modal h2 { font-size: 18px; font-weight: 900; margin-bottom: 10px; }
+    .modal ol { margin: 6px 0 0 20px; display: grid; gap: 8px; font-size: 14px; font-weight: 600; line-height: 1.4; }
+
+    .banner { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; font-size: 13px; font-weight: 700; }
+    .banner span { flex: 1; line-height: 1.3; }
+    .banner .fold { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; width: 24px; }
+    .banner .go { background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 900; padding: 10px 16px; border-radius: 12px; white-space: nowrap; }
+    .banner.folded span, .banner.folded .go { display: none; }
+    .banner.folded { width: 44px; padding: 6px; }
+    .banner.folded .fold { transform: rotate(-90deg); }
+    .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .tool { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; color: var(--text); font: 800 13px "Montserrat", sans-serif; cursor: pointer; }
+    .tool span { font-size: 18px; }
+    .tool:active { transform: scale(0.97); }
+
+    .drawer { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); max-height: 60vh; overflow: auto; z-index: 6; padding: 16px; display: none; }
+    .dtop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .dtop h2 { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
+    .tour { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: rgba(255, 255, 255, 0.06); color: var(--text); padding: 12px; border-radius: 14px; margin-bottom: 8px; cursor: pointer; text-align: left; font-family: inherit; }
+    .tour:hover { background: rgba(255, 255, 255, 0.1); }
+    .tour .em { font-size: 26px; width: 34px; text-align: center; }
+    .tour b { display: block; font-size: 15px; font-weight: 800; }
+    .tour small { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .gday { font-size: 30px; font-weight: 900; color: var(--accent); }
+    .gsub { color: var(--muted); font-size: 13px; font-weight: 700; margin-top: 2px; }
+    .grow { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+    .play { width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.1); color: var(--text); font-size: 16px; cursor: pointer; flex: none; }
+    .grow input { flex: 1; accent-color: var(--accent); height: 28px; }
+    .gticks { display: flex; justify-content: space-between; margin: 4px 0 0 62px; color: var(--muted); font-size: 12px; font-weight: 700; }
+
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 18px; z-index: 20; background: var(--sky); color: #0b3954; }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+  <div id="loading">🏝 Загружаем остров…</div>
+
+  <header>
+    <div class="panel search">
+      <span class="ico">🔍</span>
+      <input id="q" type="search" placeholder="Найди свой дом по нику" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button class="clear" id="clearQ" aria-label="Очистить">×</button>
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="panel stats">
+      <div class="row">
+        <div>Жителей: <b id="count">…</b><span class="dot">·</span>День <b id="day">…</b></div>
+        <button class="link" id="lost">Не нашёл себя?</button>
+      </div>
+      <div class="progress"><div class="bar"><i id="bar"></i></div><span id="goal">…</span></div>
+    </div>
+    <div class="panel banner" id="banner">
+      <button class="fold" id="fold" aria-label="Свернуть">⌄</button>
+      <span>🗳 Голосование за название острова и что построим завтра — в Telegram</span>
+      <a class="go" href="https://t.me/ostrov_podpischikov_bot" target="_blank" rel="noopener">Перейти</a>
+    </div>
+    <div class="tools">
+      <button class="panel tool" id="tTours"><span>📍</span>Экскурсии</button>
+      <button class="panel tool" id="tGrowth"><span>📈</span>Было — стало</button>
+      <button class="panel tool" id="tRandom"><span>🎲</span>Случайный сосед</button>
+    </div>
+  </header>
+
+  <div class="panel drawer" id="tours">
+    <div class="dtop"><h2>ЭКСКУРСИИ</h2><button class="x" data-shut="tours">×</button></div>
+    <div id="tourList"></div>
+  </div>
+
+  <div class="panel drawer" id="growth">
+    <div class="dtop"><h2>БЫЛО — СТАЛО</h2><button class="x" data-shut="growth">×</button></div>
+    <div class="gday">День <span id="gDay">1</span></div>
+    <div class="gsub">Жителей: <span id="gCount">1</span> · <span id="gWhen">сегодня</span></div>
+    <div class="grow">
+      <button class="play" id="gPlay" aria-label="Проиграть">▶</button>
+      <input type="range" id="gRange" min="1" max="1" value="1" step="1" />
+    </div>
+    <div class="gticks" id="gTicks"></div>
+  </div>
+
+  <div id="sheet" class="panel" role="dialog" aria-live="polite"></div>
+
+  <div class="modal" id="passportModal"><div class="box panel">
+    <img id="passportImg" alt="Паспорт жителя" />
+    <div class="actions">
+      <button class="btn yellow" id="ppSave">💾 Сохранить</button>
+      <button class="btn dark" id="ppShare">↗ Поделиться</button>
+    </div>
+    <button class="btn dark full" id="ppClose">Закрыть</button>
+  </div></div>
+
+  <div class="modal" id="lostModal"><div class="box panel">
+    <h2>Не нашёл свой дом?</h2>
+    <ol>
+      <li>Подпишись на <b>@ostrov.podpischikov</b></li>
+      <li>Напиши любой коммент под последним рилсом — можно попросить флаг, костёр, лодку или цвет крыши 🚩</li>
+      <li>Через 15 минут твой шалаш появится на острове. Ищи ник без «@»</li>
+    </ol>
+    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">Открыть Instagram</a>
+    <button class="btn dark full" id="lostClose">Понятно</button>
+  </div></div>
+
+  <script>
+    const IG = "ostrov.podpischikov";
+    const BOT = "https://t.me/ostrov_podpischikov_bot";
+    const DAY1 = Date.UTC(2026, 10, 2); // день выхода первого рилса
+    const SITE = location.origin + location.pathname;
+    const $ = (id) => document.getElementById(id);
+
+    // ── renderer and scene
+    const canvas = $("scene");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#8fd6f6");
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 3000);
+    scene.add(new THREE.HemisphereLight("#d8f3ff", "#5a8f3c", 0.5));
+    const sun = new THREE.DirectionalLight("#fff1d6", 0.72);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0006;
+    scene.add(sun, sun.target);
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: "#1E9CC8" }));
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.receiveShadow = true;
+    scene.add(ocean);
+
+    const controls = new THREE.OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.minDistance = 8;
+
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.fov = w < h ? 60 : 45;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // ── helpers
+    const norm = (s) => (s || "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/^@/, "").split(/[/?#\s]/)[0].toLowerCase();
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const fmt = (n) => n.toLocaleString("ru-RU");
+    const dayOf = (iso) => (iso ? Math.max(1, Math.floor((Date.parse(iso) - DAY1) / 86400000) + 1) : null);
+    const DISTRICTS = [[1.6, "Центральная площадь"], [3.2, "Пальмовый квартал"], [5.2, "Ракушечная бухта"], [8.2, "Маячный район"], [13, "Песчаные дюны"], [Infinity, "Новые земли"]];
+    const district = (ring) => DISTRICTS.find((d) => ring <= d[0])[1];
+
+    // ── data and island
+    let island, residents = [];
+    function showIsland(list) {
+      if (island) {
+        scene.remove(island.group);
+        island.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      }
+      island = OstrovIsland.build(THREE, list);
+      scene.add(island.group);
+    }
+    fetch("data/residents.json?v=" + Math.floor(Date.now() / 60000))
+      .then((r) => r.json())
+      .then((data) => {
+        residents = data.residents || data;
+        showIsland(residents);
+        const total = residents.length + 1;
+        $("count").textContent = fmt(total);
+        $("day").textContent = dayOf(new Date().toISOString());
+        const goal = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 1000000].find((g) => g > total);
+        $("goal").textContent = "До " + fmt(goal) + ": ещё " + fmt(goal - total);
+        requestAnimationFrame(() => ($("bar").style.width = Math.min(100, (total / goal) * 100).toFixed(1) + "%"));
+        const R = island.radius;
+        Object.assign(sun.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 1, far: R * 4 });
+        sun.shadow.camera.updateProjectionMatrix();
+        sun.position.set(-R * 0.9, R * 1.6, R * 0.8);
+        controls.maxDistance = R * 4;
+        scene.fog = new THREE.Fog("#a8e0f8", R * 3, R * 7);
+        flyTo(new THREE.Vector3(0, 2, 0), new THREE.Vector3(R * 0.9, R * 0.95 + 10, R * 1.25), 0);
+        $("loading").remove();
+        const fromLink = norm(new URLSearchParams(location.search).get("nick") || decodeURIComponent(location.hash.slice(1)));
+        if (fromLink) find(fromLink);
+      })
+      .catch((e) => {
+        console.error(e);
+        const el = $("loading");
+        if (el) el.textContent = "Не удалось загрузить остров 😕 Обнови страницу";
+      });
+
+    // ── camera flights
+    let flight = null;
+    function flyTo(target, pos, dur = 1.6) {
+      if (!dur) { controls.target.copy(target); camera.position.copy(pos); controls.update(); return; }
+      flight = { t0: performance.now(), dur: dur * 1000, fromT: controls.target.clone(), fromP: camera.position.clone(), toT: target, toP: pos };
+    }
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
+    // ── nick labels: nearest houses first, never overlapping; the selected one always on top
+    const labelsEl = $("labels"), pool = [];
+    let selected = null;
+    function tag(i) {
+      if (!pool[i]) { const el = document.createElement("div"); el.className = "tag"; labelsEl.appendChild(el); pool[i] = el; }
+      return pool[i];
+    }
+    const v = new THREE.Vector3();
+    function drawLabels() {
+      if (!island) return;
+      const maxTags = window.innerWidth < 600 ? 22 : 45;
+      const list = [];
+      island.houses.forEach((h) => { if (h.nick !== selected) list.push([h.top.distanceToSquared(camera.position), h]); });
+      list.sort((a, b) => a[0] - b[0]);
+      const show = list.slice(0, maxTags).map((x) => x[1]);
+      if (selected && island.houses.has(selected)) show.unshift(island.houses.get(selected));
+      const w = window.innerWidth, hgt = window.innerHeight, placed = [];
+      let used = 0;
+      show.forEach((h) => {
+        v.copy(h.top).project(camera);
+        if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
+        const me = h.nick === selected;
+        const dist = Math.sqrt(h.top.distanceToSquared(camera.position));
+        if (!me && dist > 160) return;
+        const s = me ? 1 : Math.max(0.6, Math.min(1.1, 45 / dist));
+        const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * hgt;
+        const bw = (h.nick.length + 1) * (me ? 9.5 : 7) * s + 18, bh = (me ? 28 : 21) * s;
+        const box = [x - bw / 2, y - bh, x + bw / 2, y];
+        if (placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) return;
+        placed.push(box);
+        const el = tag(used++);
+        if (el.textContent !== "@" + h.nick) el.textContent = "@" + h.nick;
+        el.classList.toggle("me", me);
+        el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(2)})`;
+        el.style.display = "";
+      });
+      for (let i = used; i < pool.length; i++) pool[i].style.display = "none";
+    }
+
+    const marker = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.4, 4), new THREE.MeshLambertMaterial({ color: "#f4d35e", emissive: "#5a4500" }));
+    marker.rotation.x = Math.PI;
+    marker.visible = false;
+    scene.add(marker);
+
+    function loop(now) {
+      requestAnimationFrame(loop);
+      if (flight) {
+        const k = Math.min(1, (now - flight.t0) / flight.dur), e = ease(k);
+        controls.target.lerpVectors(flight.fromT, flight.toT, e);
+        camera.position.lerpVectors(flight.fromP, flight.toP, e);
+        if (k >= 1) flight = null;
+      }
+      controls.update();
+      if (marker.visible) { marker.position.y = marker.userData.y + Math.sin(now / 250) * 0.4; marker.rotation.y = now / 600; }
+      renderer.render(scene, camera);
+      drawLabels();
+    }
+    requestAnimationFrame(loop);
+
+    // ── search
+    const q = $("q"), sug = $("suggest");
+    q.addEventListener("input", () => {
+      const s = norm(q.value);
+      $("clearQ").style.display = q.value ? "block" : "none";
+      if (!s) { sug.style.display = "none"; return; }
+      const hits = residents.filter((r) => r.nick.includes(s))
+        .sort((a, b) => (a.nick.startsWith(s) ? 0 : 1) - (b.nick.startsWith(s) ? 0 : 1) || a.no - b.no).slice(0, 6);
+      sug.innerHTML = "";
+      hits.forEach((r) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.innerHTML = `<span>@${esc(r.nick)}</span><small>житель №${r.no}</small>`;
+        btn.onclick = () => find(r.nick);
+        sug.appendChild(btn);
+      });
+      if (!hits.length) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.innerHTML = `<span>@${esc(s)}</span><small>пока не на острове</small>`;
+        btn.onclick = () => find(s);
+        sug.appendChild(btn);
+      }
+      sug.style.display = "block";
+    });
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") find(norm(q.value)); });
+    $("clearQ").onclick = () => { q.value = ""; $("clearQ").style.display = "none"; sug.style.display = "none"; q.focus(); };
+    document.addEventListener("click", (e) => { if (!e.target.closest(".search")) sug.style.display = "none"; });
+
+    const sheet = $("sheet");
+    function find(nick) {
+      if (!nick) return;
+      sug.style.display = "none";
+      q.blur();
+      // searching always shows today's island, even from the before/after view
+      if (island && island.houses.size !== residents.length) { $("growth").style.display = "none"; stopGrowth(true); }
+      $("tours").style.display = "none";
+      const h = island && island.houses.get(nick);
+      sheet.style.display = "block";
+      if (!h) {
+        selected = null;
+        marker.visible = false;
+        sheet.innerHTML = `<div class="top"><div class="nick">@${esc(nick)}</div><button class="x" data-close>×</button></div>
+          <p>Тебя пока нет на острове 🏝 Подпишись на @${IG} и напиши любой коммент под последним рилсом — через 15 минут здесь появится твой шалаш.</p>
+          <a class="btn yellow full" href="https://www.instagram.com/${IG}/" target="_blank" rel="noopener">Открыть Instagram</a>`;
+        return;
+      }
+      selected = nick;
+      history.replaceState(null, "", "#" + nick);
+      marker.visible = true;
+      marker.userData.y = h.top.y + 2.2;
+      marker.position.set(h.top.x, marker.userData.y, h.top.z);
+      flyTo(h.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), h.pos.clone().add(new THREE.Vector3(5, 13, 9)));
+      const lv = OstrovIsland.LEVELS[h.level - 1];
+      const r = residents.find((x) => x.nick === nick) || {};
+      const day = dayOf(r.since);
+      sheet.innerHTML = `<div class="top"><div><div class="nick">@${esc(h.nick)}</div><span class="badge">ЖИТЕЛЬ №${h.no}</span></div><button class="x" data-close>×</button></div>
+        <div class="fields">
+          <div><span>Район</span><span>${district(h.ring || 0)}</span></div>
+          <div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>
+          <div><span>Дом</span><span>${lv.emoji} ${lv.name}</span></div>
+          <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn yellow" id="share">↗ Поделиться</button>
+          <button class="btn dark" id="pass">🪪 Паспорт жителя</button>
+        </div>
+        <a class="btn dark full" href="${BOT}" target="_blank" rel="noopener">⬆️ Прокачать дом в Telegram</a>`;
+      $("share").onclick = () => shareLink(h);
+      $("pass").onclick = () => openPassport(h, district(h.ring || 0), day);
+    }
+    sheet.addEventListener("click", (e) => {
+      if (!e.target.closest("[data-close]")) return;
+      sheet.style.display = "none"; selected = null; marker.visible = false; history.replaceState(null, "", location.pathname);
+    });
+    window.addEventListener("hashchange", () => {
+      const n = norm(decodeURIComponent(location.hash.slice(1)));
+      if (n && n !== selected && island) find(n);
+    });
+
+    function shareLink(h) {
+      const url = SITE + "#" + h.nick;
+      const text = `Мой дом на Острове подписчиков 🏝 Житель №${h.no}`;
+      if (navigator.share) navigator.share({ title: "Остров подписчиков", text, url }).catch(() => {});
+      else navigator.clipboard.writeText(url).then(() => { $("share").textContent = "✓ Ссылка скопирована"; }, () => prompt("Ссылка на твой дом:", url));
+    }
+
+    // ── drawers: tours and growth (one open at a time, the resident sheet closes)
+    function openDrawer(id) {
+      ["tours", "growth"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
+      sheet.style.display = "none";
+    }
+    document.querySelectorAll("[data-shut]").forEach((b) => (b.onclick = () => {
+      $(b.dataset.shut).style.display = "none";
+      if (b.dataset.shut === "growth") stopGrowth(true);
+    }));
+    $("fold").onclick = () => $("banner").classList.toggle("folded");
+
+    // ── excursions: places on the island the camera flies to
+    function tours() {
+      const list = [...island.houses.values()];
+      const wished = list.filter((h) => h.wished);
+      const top = list.slice().sort((a, b) => b.level - a.level || a.no - b.no)[0];
+      const newest = list.slice().sort((a, b) => b.no - a.no)[0];
+      const V = (x, y, z) => new THREE.Vector3(x, y, z);
+      const items = [
+        ["🔥", "Центральная площадь", "Костёр, табличка и шалаш основателя", () => flyTo(V(0, 2.5, 0), V(7, 9, 10))],
+        ["🌴", "Пальмовый квартал", "Первые жители острова", () => { const h = island.houses.get(residents[0] && residents[0].nick); if (h) find(h.nick); }],
+        ["⚓", "Причал", "Лодка и вид на океан", () => flyTo(island.pier, island.pier.clone().add(V(-9, 7, 11)))],
+      ];
+      if (wished.length) items.push(["🚩", "Исполненные желания", `${wished.length} ${plural(wished.length, "дом", "дома", "домов")} по просьбам из комментов`, () => find(wished[Math.floor(Math.random() * wished.length)].nick)]);
+      if (top && top.level > 1) items.push([OstrovIsland.LEVELS[top.level - 1].emoji, "Лучший дом острова", "@" + top.nick + " · " + OstrovIsland.LEVELS[top.level - 1].name, () => find(top.nick)]);
+      if (newest) items.push(["🏗", "Новые земли", "Здесь строятся самые свежие дома", () => find(newest.nick)]);
+      items.push(["🏝", "Весь остров", "Вид сверху", () => { const R = island.radius; flyTo(V(0, 2, 0), V(R * 0.9, R * 0.95 + 10, R * 1.25)); }]);
+      const box = $("tourList");
+      box.innerHTML = "";
+      items.forEach(([em, title, sub, go]) => {
+        const b = document.createElement("button");
+        b.className = "tour";
+        b.innerHTML = `<span class="em">${em}</span><span><b>${esc(title)}</b><small>${esc(sub)}</small></span>`;
+        b.onclick = () => { $("tours").style.display = "none"; go(); };
+        box.appendChild(b);
+      });
+    }
+    const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+    $("tTours").onclick = () => { tours(); openDrawer("tours"); };
+
+    // ── before / after: rebuild the island as it was on day N
+    // the last day is today, or later if a resident's date is ahead of this viewer's clock
+    const today = () => Math.max(dayOf(new Date().toISOString()), ...residents.map((r) => dayOf(r.since) || 1));
+    let growthTimer = null;
+    function setDay(d) {
+      const list = residents.filter((r) => (dayOf(r.since) || 1) <= d);
+      $("gDay").textContent = d;
+      $("gCount").textContent = fmt(list.length + 1);
+      $("gWhen").textContent = d === today() ? "сегодня" : "день " + d;
+      $("gRange").value = d;
+      selected = null; marker.visible = false;
+      showIsland(list);
+    }
+    function stopGrowth(restore) {
+      clearInterval(growthTimer); growthTimer = null; $("gPlay").textContent = "▶";
+      if (restore) showIsland(residents);
+    }
+    $("tGrowth").onclick = () => {
+      const t = today();
+      $("gRange").max = t;
+      $("gTicks").innerHTML = Array.from({ length: Math.min(t, 7) }, (_, i) => `<span>${Math.round(1 + (i * (t - 1)) / Math.max(1, Math.min(t, 7) - 1))}</span>`).join("");
+      openDrawer("growth");
+      setDay(t);
+    };
+    $("gRange").oninput = (e) => { stopGrowth(false); setDay(+e.target.value); };
+    $("gPlay").onclick = () => {
+      if (growthTimer) { stopGrowth(false); return; }
+      const t = +$("gRange").max;
+      let d = 1;
+      $("gPlay").textContent = "❚❚";
+      setDay(d);
+      growthTimer = setInterval(() => { d += 1; if (d > t) { stopGrowth(false); return; } setDay(d); }, 1200);
+    };
+
+    // ── random neighbour
+    $("tRandom").onclick = () => {
+      if (!residents.length) return;
+      ["tours", "growth"].forEach((d) => ($(d).style.display = "none"));
+      stopGrowth(false);
+      if (island.houses.size !== residents.length) showIsland(residents);
+      find(residents[Math.floor(Math.random() * residents.length)].nick);
+    };
+
+    // ── lost modal
+    $("lost").onclick = () => ($("lostModal").style.display = "flex");
+    $("lostClose").onclick = () => ($("lostModal").style.display = "none");
+
+    // ── passport: 1080×1920 story card in the site's dark style
+    let ppBlob = null, ppName = "";
+    function openPassport(h, distr, day) {
+      const W = 1080, H = 1920;
+      const r2 = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      r2.setSize(920, 780, false);
+      r2.shadowMap.enabled = true;
+      const cam = new THREE.PerspectiveCamera(38, 920 / 780, 0.1, 3000);
+      cam.position.copy(h.pos).add(new THREE.Vector3(7, 6, 9));
+      cam.lookAt(h.pos.clone().add(new THREE.Vector3(0, 1.4, 0)));
+      marker.visible = true;
+      marker.position.set(h.top.x, h.top.y + 2.2, h.top.z);
+      r2.render(scene, cam);
+
+      const c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const g = c.getContext("2d");
+      g.fillStyle = "#0d1826"; g.fillRect(0, 0, W, H);
+      const glow = g.createRadialGradient(W / 2, 520, 50, W / 2, 520, 900);
+      glow.addColorStop(0, "rgba(46,196,182,0.35)"); glow.addColorStop(1, "rgba(46,196,182,0)");
+      g.fillStyle = glow; g.fillRect(0, 0, W, H);
+      g.textAlign = "center";
+      g.fillStyle = "#f4d35e"; g.font = "900 40px Montserrat"; g.fillText("🏝 ОСТРОВ ПОДПИСЧИКОВ", W / 2, 150);
+      g.fillStyle = "#ffffff"; g.font = "900 76px Montserrat"; g.fillText("ПАСПОРТ ЖИТЕЛЯ", W / 2, 245);
+      roundClip(g, 80, 300, 920, 780, 40, () => g.drawImage(r2.domElement, 80, 300, 920, 780));
+      r2.dispose();
+      let size = 86;
+      g.font = `900 ${size}px Montserrat`;
+      while (g.measureText("@" + h.nick).width > 900 && size > 40) { size -= 4; g.font = `900 ${size}px Montserrat`; }
+      g.fillStyle = "#ffffff"; g.fillText("@" + h.nick, W / 2, 1200);
+      roundRect(g, W / 2 - 190, 1240, 380, 72, 16, "#f4d35e");
+      g.fillStyle = "#1d1a0c"; g.font = "900 40px Montserrat"; g.fillText("ЖИТЕЛЬ №" + h.no, W / 2, 1291);
+      const lv = OstrovIsland.LEVELS[h.level - 1];
+      const rows = [["Район", distr], ["Заселился", day ? "день " + day : "—"], ["Дом", lv.name]];
+      g.font = "700 40px Montserrat";
+      rows.forEach(([k, val], i) => {
+        const y = 1420 + i * 78;
+        g.textAlign = "left"; g.fillStyle = "rgba(255,255,255,0.6)"; g.fillText(k, 140, y);
+        g.textAlign = "right"; g.fillStyle = "#ffffff"; g.fillText(val, W - 140, y);
+        g.fillStyle = "rgba(255,255,255,0.1)"; g.fillRect(140, y + 26, W - 280, 2);
+      });
+      g.textAlign = "center"; g.fillStyle = "#f4d35e"; g.font = "800 38px Montserrat"; g.fillText("Найди свой дом · @" + IG, W / 2, 1800);
+      c.toBlob((blob) => {
+        ppBlob = blob; ppName = `ostrov-${h.nick}.png`;
+        $("passportImg").src = URL.createObjectURL(blob);
+        $("passportModal").style.display = "flex";
+      }, "image/png");
+    }
+    $("ppSave").onclick = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(ppBlob); a.download = ppName; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    $("ppShare").onclick = () => {
+      const file = new File([ppBlob], ppName, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: "Мой дом на Острове подписчиков" }).catch(() => {});
+      else $("ppSave").click();
+    };
+    $("ppClose").onclick = () => ($("passportModal").style.display = "none");
+    function roundRect(g, x, y, w, h, r, fill) { roundPath(g, x, y, w, h, r); g.fillStyle = fill; g.fill(); }
+    function roundClip(g, x, y, w, h, r, draw) { g.save(); roundPath(g, x, y, w, h, r); g.clip(); draw(); g.restore(); }
+    function roundPath(g, x, y, w, h, r) {
+      g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+    }
+  </script>
+</body>
+</html>
