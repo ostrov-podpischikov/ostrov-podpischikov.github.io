@@ -101,6 +101,15 @@
     .tour .em { font-size: 26px; width: 34px; text-align: center; }
     .tour b { display: block; font-size: 15px; font-weight: 800; }
     .tour small { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .poll + .poll { margin-top: 18px; }
+    .poll h3 { font-size: 17px; font-weight: 900; }
+    .poll .how { color: var(--muted); font-size: 13px; font-weight: 600; margin: 4px 0 12px; line-height: 1.4; }
+    .opt { position: relative; overflow: hidden; border-radius: 12px; background: rgba(255, 255, 255, 0.06); margin-bottom: 8px; padding: 11px 12px; display: flex; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 14px; }
+    .opt i { position: absolute; inset: 0 auto 0 0; background: rgba(244, 211, 94, 0.22); border-radius: 12px; transition: width 0.8s; }
+    .opt.lead i { background: rgba(244, 211, 94, 0.4); }
+    .opt span { position: relative; }
+    .opt .num { display: inline-block; min-width: 22px; color: var(--accent); }
+    .poll .total { color: var(--muted); font-size: 12px; font-weight: 700; margin-top: 4px; }
     .gday { font-size: 30px; font-weight: 900; color: var(--accent); }
     .gsub { color: var(--muted); font-size: 13px; font-weight: 700; margin-top: 2px; }
     .grow { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
@@ -132,8 +141,8 @@
     </div>
     <div class="panel banner" id="banner">
       <button class="fold" id="fold" aria-label="Свернуть">⌄</button>
-      <span>🗳 Голосование за название острова и что построим завтра — в Telegram</span>
-      <a class="go" href="https://t.me/ostrov_podpischikov_bot" target="_blank" rel="noopener">Перейти</a>
+      <span id="bannerText">🗳 Голосование: как назовём остров? Голосуй комментом — итоги здесь</span>
+      <button class="go" id="openPoll">Голосовать</button>
     </div>
     <div class="tools">
       <button class="panel tool" id="tTours"><span>📍</span>Экскурсии</button>
@@ -145,6 +154,12 @@
   <div class="panel drawer" id="tours">
     <div class="dtop"><h2>ЭКСКУРСИИ</h2><button class="x" data-shut="tours">×</button></div>
     <div id="tourList"></div>
+  </div>
+
+  <div class="panel drawer" id="polls">
+    <div class="dtop"><h2>ГОЛОСОВАНИЕ</h2><button class="x" data-shut="polls">×</button></div>
+    <div id="pollBody"></div>
+    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 Проголосовать в Instagram</a>
   </div>
 
   <div class="panel drawer" id="growth">
@@ -372,6 +387,7 @@
       // searching always shows today's island, even from the before/after view
       if (island && island.houses.size !== residents.length) { $("growth").style.display = "none"; stopGrowth(true); }
       $("tours").style.display = "none";
+      $("polls").style.display = "none";
       const h = island && island.houses.get(nick);
       sheet.style.display = "block";
       if (!h) {
@@ -424,9 +440,29 @@
 
     // ── drawers: tours and growth (one open at a time, the resident sheet closes)
     function openDrawer(id) {
-      ["tours", "growth"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
+      ["tours", "growth", "polls"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
       sheet.style.display = "none";
     }
+
+    // ── polls: votes are comments under the reels, counted every 15 minutes
+    let polls = [];
+    fetch("data/polls.json?v=" + Math.floor(Date.now() / 60000)).then((r) => (r.ok ? r.json() : [])).then((p) => {
+      polls = p || [];
+      if (polls[0]) $("bannerText").textContent = `🗳 ${polls[0].question} Голосуй комментом — итоги здесь`;
+    }).catch(() => {});
+    function renderPolls() {
+      $("pollBody").innerHTML = polls.length ? polls.map((p) => {
+        const max = Math.max(1, ...p.options.map((o) => o.votes));
+        return `<div class="poll"><h3>${esc(p.question)}</h3><div class="how">${esc(p.how)}</div>
+          ${p.options.map((o) => {
+            const pct = p.total ? Math.round((o.votes / p.total) * 100) : 0;
+            return `<div class="opt ${o.votes === max && o.votes > 0 ? "lead" : ""}"><i style="width:${pct}%"></i>
+              <span><span class="num">${esc(o.key)}</span> ${esc(o.emoji)} ${esc(o.label)}</span><span>${pct}% · ${o.votes}</span></div>`;
+          }).join("")}
+          <div class="total">Голосов: ${fmt(p.total)} · обновляется каждые 15 минут</div></div>`;
+      }).join("") : `<p class="how">Сейчас голосований нет — следи за рилсами 🏝</p>`;
+    }
+    $("openPoll").onclick = () => { renderPolls(); openDrawer("polls"); };
     document.querySelectorAll("[data-shut]").forEach((b) => (b.onclick = () => {
       $(b.dataset.shut).style.display = "none";
       if (b.dataset.shut === "growth") stopGrowth(true);
@@ -499,7 +535,7 @@
     // ── random neighbour
     $("tRandom").onclick = () => {
       if (!residents.length) return;
-      ["tours", "growth"].forEach((d) => ($(d).style.display = "none"));
+      ["tours", "growth", "polls"].forEach((d) => ($(d).style.display = "none"));
       stopGrowth(false);
       if (island.houses.size !== residents.length) showIsland(residents);
       find(residents[Math.floor(Math.random() * residents.length)].nick);
