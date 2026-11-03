@@ -40,7 +40,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-from build_map import WISHES  # noqa: E402  the same wish words the island uses
+from build_map import WISHES, find_business  # noqa: E402  the same wish and business words the island uses
 
 OWN = "ostrov.podpischikov"
 MAX_PER_RUN = 8
@@ -91,6 +91,15 @@ AGAIN = [
     "@{nick}, зови друзей — пусть селятся рядом с домом №{no} 🏡",
     "@{nick}, ❤️ остров растёт благодаря тебе, житель №{no}",
 ]
+BIZ_REPLY = [
+    "@{nick}, открываем {biz} на участке №{no} 🏪 Через 15 минут вывеска будет на острове",
+    "@{nick}, {biz} — принято! Строим на участке №{no} 🛠 Ищи вывеску на сайте",
+    "@{nick}, у острова новый бизнес: {biz} на участке №{no} 🏝 Хочешь своё название — напиши его в кавычках",
+]
+BIZ_TITLES = {"shop": "магазин", "cafe": "кафе", "shawarma": "шаурму", "pizza": "пиццерию", "sushi": "суши-бар", "burger": "бургерную",
+              "icecream": "киоск мороженого", "bar": "пляжный бар", "fish": "рыбную лавку", "hotel": "отель", "cinema": "кинотеатр",
+              "surf": "сёрф-станцию", "bank": "банк", "farm": "ферму", "pharmacy": "аптеку", "barber": "барбершоп", "gym": "спортзал",
+              "garage": "автосервис"}
 WISH_WORDS = {"flag": "флаг 🚩", "fire": "костёр 🔥", "boat": "лодку 🛶", "pet": "питомца 🐶", "palm": "пальму 🌴",
               "lamp": "фонарь 🏮", "ball": "мяч ⚽"}
 BLOCK_CODES = {4, 17, 32, 368, 613}  # rate limit / temporarily blocked
@@ -215,11 +224,14 @@ def main():
         r = residents[nick]
         first = r.get("cid") == c["id"] or nick not in st["nicks"]
         vote, wish = find_vote(c.get("text", ""), polls, c["time"]), find_wish(c.get("text", ""))
-        if first:
+        biz = BIZ_TITLES.get(find_business(c.get("text", "")))
+        if biz:
+            tpl = pick(BIZ_REPLY, c["id"], k)
+        elif first:
             tpl = pick(WELCOME_VOTE, c["id"], k) if vote else pick(WELCOME_WISH, c["id"], k) if wish else pick(WELCOME, c["id"], k)
         else:
             tpl = pick(VOTE, c["id"], k) if vote else pick(WISH, c["id"], k) if wish else pick(AGAIN, c["id"], k)
-        text = tpl.format(nick=nick, no=r["no"], opt=vote, wish=wish)
+        text = tpl.format(nick=nick, no=r["no"], opt=vote, wish=wish, biz=biz)
         if args.dry_run:
             print(f"  «{c.get('text', '')[:40]}» → {text}")
             continue
