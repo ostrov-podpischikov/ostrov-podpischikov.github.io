@@ -10,7 +10,12 @@
  * выбирается по нику и не меняется; пожелания из комментов (r.wish) добавляют свои детали.
  */
 (function (root) {
-  const PLOT = 7;          // шаг сетки участков
+  // пропорции как у «Города подписчиков»: дом ≈ 0.5–0.6 участка, улица ≈ 2/3 ширины дома
+  const PLOT = 10.5;       // шаг сетки участков
+  const STREET = 3.0;      // ширина улицы
+  const HOUSE = 1.8;       // во сколько раз дом крупнее своей модели
+  const YARD = 1.75;       // вещи во дворе отодвинуты к углам участка, чтобы не влезать в дом
+  const ITEM = 1.3;        // и чуть крупнее, под стать дому
   const TERRAIN = 2;       // размер колонки рельефа
   const LEVELS = [
     { name: "Шалаш", emoji: "⛺" },
@@ -68,14 +73,21 @@
     return PLOTS[idx];
   }
 
-  function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; }
+  function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.xf = null; }
+  // boxes added after around(x, y, z, s) are scaled by s about that point; around() with no args resets
+  Builder.prototype.around = function (x, y, z, s) {
+    const T = this.T;
+    this.xf = s && s !== 1 ? new T.Matrix4().makeTranslation(x, y, z).multiply(new T.Matrix4().makeScale(s, s, s)).multiply(new T.Matrix4().makeTranslation(-x, -y, -z)) : null;
+    return this;
+  };
   Builder.prototype.box = function (x, y, z, w, h, d, top, side, rotZ, rotY, rotX) {
     const T = this.T;
     const g = new T.BoxGeometry(w, h, d).toNonIndexed();
     const m = new T.Matrix4().makeRotationFromEuler(new T.Euler(rotX || 0, rotY || 0, rotZ || 0));
     m.setPosition(x, y, z);
     g.applyMatrix4(m);
-    const p = g.attributes.position.array, n = g.attributes.normal.array;
+    if (this.xf) g.applyMatrix4(this.xf);
+    const p =g.attributes.position.array, n = g.attributes.normal.array;
     const ct = new T.Color(top), cs = new T.Color(side || top), cb = cs.clone().multiplyScalar(0.82);
     for (let i = 0; i < p.length; i += 3) {
       this.pos.push(p[i], p[i + 1], p[i + 2]);
@@ -445,13 +457,13 @@
     segs.forEach((s) => {
       const [i, j] = s.slice(1).split(",").map(Number);
       const col = hash(i * 5 + (s[0] === "v" ? 1 : 7), j) < 0.5 ? C.path : C.path2;
-      if (s[0] === "v") { const x = i * PLOT - H, z = j * PLOT; if (topAt(x, z) === 2) b.box(x, 2.03, z, 1.6, 0.06, PLOT, col); }
-      else { const x = i * PLOT, z = j * PLOT - H; if (topAt(x, z) === 2) b.box(x, 2.03, z, PLOT, 0.06, 1.6, col); }
+      if (s[0] === "v") { const x = i * PLOT - H, z = j * PLOT; if (topAt(x, z) === 2) b.box(x, 2.03, z, STREET, 0.06, PLOT, col); }
+      else { const x = i * PLOT, z = j * PLOT - H; if (topAt(x, z) === 2) b.box(x, 2.03, z, PLOT, 0.06, STREET, col); }
     });
     corners.forEach((s) => {
       const [i, j] = s.split(",").map(Number);
       const x = i * PLOT - H, z = j * PLOT - H;
-      if (topAt(x, z) === 2 && hash(i + 31, j - 17) < 0.28) ITEMS.torch(b, x + 0.9, 2, z + 0.9);
+      if (topAt(x, z) === 2 && hash(i + 31, j - 17) < 0.28) ITEMS.torch(b, x + STREET / 2 + 0.1, 2, z + STREET / 2 + 0.1);
     });
 
     // houses; with opts.perHouse every house is its own mesh (origin at its plot) so videos can animate them
@@ -461,12 +473,19 @@
       const lvl = Math.min(7, Math.max(1, r.level || 1));
       const v = look(r);
       const biz = BIZ[r.biz];
-      b.box(x, y + 0.03, z, 5.4, 0.06, 5.4, biz ? C.stone : C.pad);
+      b.box(x, y + 0.03, z, PLOT - STREET, 0.06, PLOT - STREET, biz ? C.stone : C.pad);
       // a business replaces the hut; its own props stand where the yard items would be
       const draw = (bb, ox, oz) => {
-        if (biz) { biz.draw(bb, ox, y0(bb), oz, v); return; }
+        bb.around(ox, y0(bb), oz, HOUSE);
+        if (biz) { biz.draw(bb, ox, y0(bb), oz, v); bb.around(); return; }
         MODELS[lvl - 1](bb, ox, y0(bb), oz, v);
-        v.items.forEach((it, s) => ITEMS[it](bb, ox + SLOTS[s][0], y0(bb), oz + SLOTS[s][1], v));
+        bb.around();
+        v.items.forEach((it, s) => {
+          const ix = ox + SLOTS[s][0] * YARD, iz = oz + SLOTS[s][1] * YARD;
+          bb.around(ix, y0(bb), iz, ITEM);
+          ITEMS[it](bb, ix, y0(bb), iz, v);
+          bb.around();
+        });
       };
       const y0 = (bb) => (bb === b ? y : 0);
       let mesh = null, signHost = group, sx = x, sy = y, sz = z;
@@ -482,12 +501,13 @@
       if (biz) {
         const label = r.brand ? "«" + r.brand + "»" : "@" + r.nick;
         // the sign: a dark board on two posts in front of the building, facing the street
-        const sb = new Builder(THREE);
+        const sb = new Builder(THREE).around(sx, sy, sz, HOUSE);
         sb.box(sx - 1.45, sy + (biz.h + 0.45) / 2, sz + SIGN_Z - 0.05, 0.12, biz.h + 0.45, 0.12, C.log2).box(sx + 1.45, sy + (biz.h + 0.45) / 2, sz + SIGN_Z - 0.05, 0.12, biz.h + 0.45, 0.12, C.log2);
         sb.box(sx, sy + biz.h + 0.45, sz + SIGN_Z - 0.03, 3.1, 0.86, 0.08, C.navy);
         signHost.add(sb.mesh());
         const face = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.8), new THREE.MeshBasicMaterial({ map: bizSignTexture(THREE, biz, label) }));
-        face.position.set(sx, sy + biz.h + 0.45, sz + SIGN_Z + 0.02);
+        face.position.set(sx, sy + (biz.h + 0.45) * HOUSE, sz + (SIGN_Z + 0.02) * HOUSE);
+        face.scale.setScalar(HOUSE);
         signHost.add(face);
         bizInfo = { kind: r.biz, title: biz.title, emoji: biz.emoji, label };
       }
@@ -495,14 +515,14 @@
         mesh,
         no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo,
         features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
-        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : HEIGHT[lvl - 1]) + 0.6, z),
+        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : HEIGHT[lvl - 1]) * HOUSE + 0.6, z),
       });
     });
 
     // empty plots: corner stakes, a rope and a little sign — «your place is waiting»
     emptyCells.forEach(([i, j]) => {
-      const x = i * PLOT, z = j * PLOT, y = 2, s = 2.2;
-      b.box(x, y + 0.03, z, 5.0, 0.06, 5.0, C.sand2);
+      const x = i * PLOT, z = j * PLOT, y = 2, s = (PLOT - STREET) / 2 - 0.4;
+      b.box(x, y + 0.03, z, PLOT - STREET - 0.4, 0.06, PLOT - STREET - 0.4, C.sand2);
       [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
       b.box(x, y + 0.72, z - s, 2 * s, 0.06, 0.06, C.rope).box(x, y + 0.72, z + s, 2 * s, 0.06, 0.06, C.rope);
       b.box(x - s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope).box(x + s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope);
@@ -511,7 +531,7 @@
     });
 
     // plaza: big campfire, log benches, the founder's hut and the sign
-    b.box(0, 2.03, 0, PLOT - 1.4, 0.06, PLOT - 1.4, C.path);
+    b.box(0, 2.03, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
     for (let a = 0; a < 10; a++) {
       const ang = (a / 10) * Math.PI * 2;
       b.box(Math.cos(ang) * 1.1, 2.15, Math.sin(ang) * 1.1, 0.4, 0.3, 0.4, a % 2 ? C.stone : C.stone2);
