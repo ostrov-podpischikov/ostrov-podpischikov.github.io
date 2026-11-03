@@ -72,6 +72,8 @@ def main():
     first = {}
     for c in sorted(comments, key=lambda c: c["time"]):
         nick = c.get("username", "")
+        if c.get("reply"):
+            continue  # answer top-level comments only; a reply inside a thread can't get a nested reply
         if nick and nick != OWN and nick not in first:
             first[nick] = c
     pending = [c for nick, c in first.items()
