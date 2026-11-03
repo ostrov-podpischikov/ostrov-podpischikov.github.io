@@ -248,10 +248,17 @@
     ocean.receiveShadow = true;
     scene.add(ocean);
 
-    const controls = new THREE.OrbitControls(camera, canvas);
+    // map-style: one finger / left mouse drags the island, two fingers zoom and turn, right mouse tilts
+    const controls = new THREE.MapControls(camera, canvas);
     controls.enableDamping = true;
-    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.dampingFactor = 0.12;
+    controls.screenSpacePanning = false;
+    controls.maxPolarAngle = 1.25;
+    controls.minPolarAngle = 0.05;
     controls.minDistance = 8;
+    controls.rotateSpeed = 0.55;
+    controls.zoomSpeed = 1.1;
+    const panOffset = new THREE.Vector3();
 
     function resize() {
       const w = window.innerWidth, h = window.innerHeight;
@@ -375,6 +382,9 @@
         if (k >= 1) flight = null;
       }
       controls.update();
+      // keep the view over the island: dragging can't carry it out to the open ocean
+      const lim = island ? island.radius * 1.1 : 0, t = controls.target, d = Math.hypot(t.x, t.z);
+      if (lim && d > lim) { panOffset.set(t.x, 0, t.z).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
       if (marker.visible) { marker.position.y = marker.userData.y + Math.sin(now / 250) * 0.4; marker.rotation.y = now / 600; }
       renderer.render(scene, camera);
       drawLabels();
