@@ -119,6 +119,28 @@
     .grow input { flex: 1; accent-color: var(--accent); height: 28px; }
     .gticks { display: flex; justify-content: space-between; margin: 4px 0 0 62px; color: var(--muted); font-size: 12px; font-weight: 700; }
 
+    /* phones: compact top panels, tools as a bottom bar, so the island stays visible */
+    @media (max-width: 600px) {
+      header { top: 8px; left: 8px; right: 8px; width: auto; transform: none; gap: 6px; }
+      .panel { border-radius: 14px; }
+      .search { height: 40px; padding: 0 12px; gap: 8px; }
+      .search .ico { font-size: 15px; }
+      .search input { font-size: 15px; }
+      .stats { padding: 7px 12px 8px; }
+      .stats .row { font-size: 12px; }
+      .link { font-size: 11px; }
+      .progress { margin-top: 5px; font-size: 10px; }
+      .bar { height: 5px; }
+      .empty-info { margin-top: 4px; font-size: 10.5px; }
+      .banner { padding: 5px 5px 5px 6px; gap: 6px; font-size: 11.5px; }
+      .banner .fold { font-size: 15px; width: 20px; }
+      .banner .go { padding: 7px 11px; border-radius: 10px; font-size: 12px; }
+      .banner.folded { width: 34px; padding: 4px; }
+      .tools { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); gap: 6px; z-index: 4; }
+      .tool { flex-direction: row; justify-content: center; gap: 5px; padding: 8px 4px; font-size: 11.5px; border-radius: 12px; line-height: 1.1; }
+      .tool span { font-size: 14px; }
+    }
+
     #loading { position: fixed; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 18px; z-index: 20; background: var(--sky); color: #0b3954; }
   </style>
 </head>
@@ -454,7 +476,7 @@
     let polls = [];
     fetch("data/polls.json?v=" + Math.floor(Date.now() / 60000)).then((r) => (r.ok ? r.json() : [])).then((p) => {
       polls = p || [];
-      if (polls[0]) $("bannerText").textContent = `🗳 ${polls[0].question} Голосуй комментом — итоги здесь`;
+      if (polls[0]) $("bannerText").textContent = `🗳 ${polls[0].question} Голосуй комментом`;
     }).catch(() => {});
     function renderPolls() {
       $("pollBody").innerHTML = polls.length ? polls.map((p) => {
