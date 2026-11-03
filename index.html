@@ -40,7 +40,7 @@
 
     header { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); z-index: 5; display: grid; gap: 8px; }
     .panel { background: var(--panel); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
-    .search { position: relative; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 52px; }
+    .search { position: relative; z-index: 3; display: flex; /* above the stats panel, so the suggestions list is never covered */ align-items: center; gap: 10px; padding: 0 14px; height: 52px; }
     .search .ico { font-size: 18px; opacity: 0.9; }
     .search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font: 700 16px "Montserrat", sans-serif; outline: none; }
     .search input::placeholder { color: var(--muted); }
@@ -544,14 +544,15 @@
 
     // ── before / after: rebuild the island as it was on day N
     // the last day is today, or later if a resident's date is ahead of this viewer's clock
-    const today = () => Math.max(dayOf(new Date().toISOString()), ...residents.map((r) => dayOf(r.since) || 1));
+    // the slider walks through residents in number order: step 0 is day 1 with only the founder's hut
+    const byNo = () => [...residents].sort((a, b) => a.no - b.no);
     let growthTimer = null;
-    function setDay(d) {
-      const list = residents.filter((r) => (dayOf(r.since) || 1) <= d);
-      $("gDay").textContent = d;
+    function setDay(k) {
+      const all = byNo(), list = all.slice(0, k), lastR = list[list.length - 1];
+      $("gDay").textContent = lastR ? dayOf(lastR.since) || 1 : 1;
       $("gCount").textContent = fmt(list.length + 1);
-      $("gWhen").textContent = d === today() ? "сегодня" : "день " + d;
-      $("gRange").value = d;
+      $("gWhen").textContent = k >= all.length ? "сегодня" : k === 0 ? "только основатель" : "житель №" + lastR.no;
+      $("gRange").value = k;
       selected = null; marker.visible = false;
       showIsland(list);
     }
@@ -560,20 +561,24 @@
       if (restore) showIsland(residents);
     }
     $("tGrowth").onclick = () => {
-      const t = today();
-      $("gRange").max = t;
-      $("gTicks").innerHTML = Array.from({ length: Math.min(t, 7) }, (_, i) => `<span>${Math.round(1 + (i * (t - 1)) / Math.max(1, Math.min(t, 7) - 1))}</span>`).join("");
+      const last = residents.length, days = Math.max(1, ...residents.map((r) => dayOf(r.since) || 1));
+      $("gRange").min = 0;
+      $("gRange").max = last;
+      $("gTicks").innerHTML = Array.from({ length: Math.min(days, 7) }, (_, i) => `<span>День ${Math.round(1 + (i * (days - 1)) / Math.max(1, Math.min(days, 7) - 1))}</span>`).join("");
       openDrawer("growth");
-      setDay(t);
+      setDay(last);
     };
     $("gRange").oninput = (e) => { stopGrowth(false); setDay(+e.target.value); };
     $("gPlay").onclick = () => {
       if (growthTimer) { stopGrowth(false); return; }
-      const t = +$("gRange").max;
-      let d = 1;
+      const last = +$("gRange").max;
+      // ~6 seconds whatever the size: slow at first (one house at a time), then whole streets per frame
+      const frames = 40, steps = [0];
+      for (let f = 1; f <= frames; f++) steps.push(Math.max(steps[f - 1] + 1, Math.round(last * Math.pow(f / frames, 2))));
+      let f = 0;
       $("gPlay").textContent = "❚❚";
-      setDay(d);
-      growthTimer = setInterval(() => { d += 1; if (d > t) { stopGrowth(false); return; } setDay(d); }, 1200);
+      setDay(0);
+      growthTimer = setInterval(() => { f += 1; if (f > frames || steps[f - 1] >= last) { stopGrowth(false); return; } setDay(Math.min(last, steps[f])); }, 150);
     };
 
     // ── random neighbour
