@@ -38,6 +38,7 @@ jobs:
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           AUTO_REPLY: ${{ vars.AUTO_REPLY }}
+          AUTO_REPLY_SINCE: ${{ vars.AUTO_REPLY_SINCE }}
         run: python tools/auto_reply.py
 
       - name: Сохранить, если что-то изменилось
