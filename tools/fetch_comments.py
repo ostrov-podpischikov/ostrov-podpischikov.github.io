@@ -133,7 +133,7 @@ def main():
     for n, m in enumerate(media, 1):
         got = 0
         for c in pages(f"{m['id']}/comments", token, fields="id,text,username,timestamp", limit=50):
-            comments.append({"reel": m["permalink"], "reel_time": m["timestamp"], "username": (c.get("username") or "").lower(),
+            comments.append({"id": c.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (c.get("username") or "").lower(),
                              "text": c.get("text", ""), "time": c["timestamp"]})
             got += 1
         print(f"  рилс {n}: {m['permalink']}  комментов {got} (по счётчику {m.get('comments_count', '?')})")
