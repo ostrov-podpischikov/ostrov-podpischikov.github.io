@@ -121,15 +121,18 @@ def main():
             out.append({"no": start + i, "nick": f"demo_{i:04d}", "level": min(7, lvl), "since": "2026-11-03"})
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    stats_file = HERE / "stats.json"
+    followers = json.loads(stats_file.read_text(encoding="utf-8")).get("followers") if stats_file.exists() else None
     try:
-        same = json.loads(OUT.read_text(encoding="utf-8")).get("residents") == out
+        prev = json.loads(OUT.read_text(encoding="utf-8"))
+        same = prev.get("residents") == out and prev.get("followers") == followers
     except (OSError, ValueError, AttributeError):
         same = False
     if same:
         print(f"= Карта: {len(out)} жителей, без изменений")
     else:
-        write_atomic(OUT, json.dumps({"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "residents": out},
-                                     ensure_ascii=False, separators=(",", ":")))
+        write_atomic(OUT, json.dumps({"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "followers": followers,
+                                      "residents": out}, ensure_ascii=False, separators=(",", ":")))
         print(f"✅ Карта: {len(out)} жителей (+ остров №1) → {OUT}")
 
     polls = tally_polls()
