@@ -37,17 +37,55 @@ WISHES = [
 ]
 
 
+# a business instead of a hut: word starts in a comment → building type on the island (the latest request wins)
+BUSINESSES = [
+    ("shawarma", ["шаурм", "шаверм", "донер"]), ("pizza", ["пицц"]), ("sushi", ["суши", "ролл"]),
+    ("burger", ["бургер", "фастфуд", "макдон", "kfc"]), ("icecream", ["морожен"]), ("cafe", ["кафе", "кофейн", "кофе", "ресторан", "столов"]),
+    ("barber", ["барбер", "парикмахер", "салон красот"]), ("bar", ["бар", "коктейл"]), ("shop", ["магазин", "маркет", "лавк", "ларек", "супермаркет"]), ("fish", ["рыбн", "рыбак", "рыбалк"]),
+    ("hotel", ["отел", "гостиниц", "хостел"]), ("cinema", ["кинотеатр", "кино"]), ("surf", ["серф", "сёрф"]), ("bank", ["банк"]),
+    ("farm", ["ферм", "огород"]), ("pharmacy", ["аптек"]),
+    ("gym", ["качалк", "спортзал", "фитнес"]), ("garage", ["автосервис", "автомойк", "заправк", "гараж"]),
+]
+BAD = ["хуй", "хуе", "пизд", "бля", "еба", "ебл", "ебу", "сука", "суки", "нахуй", "жоп", "член", "секс", "порн", "гей", "пидор", "шлюх", "fuck", "porn", "sex"]
+
+
+def find_business(text):
+    words = re.findall(r"[a-zа-я]+", text.lower().replace("ё", "е"))
+    for kind, starts in BUSINESSES:
+        if any(w.startswith(s.replace("ё", "е")) for s in starts for w in words):
+            return kind
+    return None
+
+
+def find_brand(text):
+    """A name in quotes («У Ахмеда», "Sunrise") goes on the sign — short, letters only, nothing rude."""
+    m = re.search(r"[«\"“']([^»\"”']{2,40})[»\"”']", text)
+    if not m:
+        return None
+    name = re.sub(r"[^\w\s\-&!.]", "", m.group(1)).strip()[:18]
+    low = name.lower().replace("ё", "е")
+    if len(name) < 2 or any(b in low for b in BAD) or "http" in low or "@" in m.group(1):
+        return None
+    return name
+
+
 def wishes_by_nick():
+    """nick → {"wish": [tags], "biz": kind, "brand": name}"""
     f = HERE / "comments.json"
     if not f.exists():
         return {}
     out = {}
-    for c in json.loads(f.read_text(encoding="utf-8")):
-        text = c.get("text", "").lower().replace("ё", "е")
+    for c in sorted(json.loads(f.read_text(encoding="utf-8")), key=lambda c: c["time"]):
+        raw = c.get("text", "")
+        text = raw.lower().replace("ё", "е")
         tags = [tag for tag, words in WISHES if any(w in text for w in words)]
-        if tags:
-            cur = out.setdefault(c["username"], [])
-            cur += [t for t in tags if t not in cur]
+        biz = find_business(raw)
+        if not tags and not biz:
+            continue
+        cur = out.setdefault(c["username"], {"wish": []})
+        cur["wish"] += [t for t in tags if t not in cur["wish"]]
+        if biz:
+            cur["biz"], cur["brand"] = biz, find_brand(raw)
     return out
 
 
@@ -109,9 +147,15 @@ def main():
                 residents[nick] = {"no": no, "nick": nick, "level": level, "since": (linked or "")[:10]}
         db.close()
 
-    for nick, tags in wishes_by_nick().items():
-        if nick in residents:
-            residents[nick]["wish"] = tags
+    for nick, w in wishes_by_nick().items():
+        if nick not in residents:
+            continue
+        if w["wish"]:
+            residents[nick]["wish"] = w["wish"]
+        if w.get("biz"):
+            residents[nick]["biz"] = w["biz"]
+            if w.get("brand"):
+                residents[nick]["brand"] = w["brand"]
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
