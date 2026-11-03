@@ -36,7 +36,7 @@
     trunk: "#A9733F", leaf: "#3FA34D", leaf2: "#2F8C3E", white: "#FFFFFF", red: "#E2483D", lamp: "#FFD93B",
     log: "#8A5530", log2: "#6E4123", door: "#4A2F17", glass: "#9FE3FF", cream: "#F1D3A1", stone: "#9AA0A6",
     stone2: "#7D838A", pool: "#3FC1E0", pad: "#E3CF94", path: "#D2B77A", path2: "#C9AC6C", flower: "#FF7AA8",
-    fl2: "#FFE066", flame: "#FF8C1A", flame2: "#FFD23F", plank: "#B98552", plank2: "#A87443",
+    fl2: "#FFE066", rope: "#D8C9A3", flame: "#FF8C1A", flame2: "#FFD23F", plank: "#B98552", plank2: "#A87443",
   };
   const STRAW = [["#E0B04E", "#C8933A"], ["#C9A86A", "#A88848"], ["#D9C27A", "#B7A05C"], ["#B98552", "#8F6236"]];
   const CANVAS = [["#F5F0E6", "#2EC4B6"], ["#F5F0E6", "#E2483D"], ["#F2E3B3", "#2E86AB"], ["#EDE7DA", "#8E5BD9"]];
@@ -258,16 +258,22 @@
    * residents: [{ no, nick, level, wish? }] — no ≥ 2, level 1..7
    * returns { group, houses: Map, radius, plaza: Vector3, sign }
    */
-  function build(THREE, residents) {
+  function build(THREE, residents, opts) {
+    opts = opts || {};
     const group = new THREE.Group();
     const houses = new Map();
     const rows = residents.filter((r) => r.no >= 2).sort((a, b) => a.no - b.no);
 
     let far = 1;
     const cells = rows.map((r) => { const c = plotCell(r.no); far = Math.max(far, c[2]); return c; });
+    // empty plots waiting for followers who have not commented yet: the next cells after the last resident
+    const lastNo = rows.length ? rows[rows.length - 1].no : 1;
+    const emptyCells = [];
+    for (let k = 1; k <= (opts.emptyPlots || 0); k++) { const c = plotCell(lastNo + k); far = Math.max(far, c[2]); emptyCells.push(c); }
     const R = Math.max(18, (far + 1) * PLOT + 7);
     const grassR = R - 6;
     const occupied = new Set(cells.map((c) => c[0] + "," + c[1]));
+    emptyCells.forEach((c) => occupied.add(c[0] + "," + c[1]));
     occupied.add("0,0");
 
     // terrain columns
@@ -314,20 +320,42 @@
       if (topAt(x, z) === 2 && hash(i + 31, j - 17) < 0.28) ITEMS.torch(b, x + 0.9, 2, z + 0.9);
     });
 
-    // houses
+    // houses; with opts.perHouse every house is its own mesh (origin at its plot) so videos can animate them
     rows.forEach((r, k) => {
       const [i, j, d] = cells[k];
       const x = i * PLOT, z = j * PLOT, y = 2;
       const lvl = Math.min(7, Math.max(1, r.level || 1));
       const v = look(r);
       b.box(x, y + 0.03, z, 5.4, 0.06, 5.4, C.pad);
-      MODELS[lvl - 1](b, x, y, z, v);
-      v.items.forEach((it, s) => ITEMS[it](b, x + SLOTS[s][0], y, z + SLOTS[s][1], v));
+      let mesh = null;
+      if (opts.perHouse) {
+        const hb = new Builder(THREE);
+        MODELS[lvl - 1](hb, 0, 0, 0, v);
+        v.items.forEach((it, s) => ITEMS[it](hb, SLOTS[s][0], 0, SLOTS[s][1], v));
+        mesh = hb.mesh();
+        mesh.position.set(x, y, z);
+        group.add(mesh);
+      } else {
+        MODELS[lvl - 1](b, x, y, z, v);
+        v.items.forEach((it, s) => ITEMS[it](b, x + SLOTS[s][0], y, z + SLOTS[s][1], v));
+      }
       houses.set(r.nick, {
+        mesh,
         no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d,
         features: v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0,
         pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + HEIGHT[lvl - 1] + 0.6, z),
       });
+    });
+
+    // empty plots: corner stakes, a rope and a little sign — «your place is waiting»
+    emptyCells.forEach(([i, j]) => {
+      const x = i * PLOT, z = j * PLOT, y = 2, s = 2.2;
+      b.box(x, y + 0.03, z, 5.0, 0.06, 5.0, C.sand2);
+      [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
+      b.box(x, y + 0.72, z - s, 2 * s, 0.06, 0.06, C.rope).box(x, y + 0.72, z + s, 2 * s, 0.06, 0.06, C.rope);
+      b.box(x - s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope).box(x + s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope);
+      b.box(x + 0.8, y + 0.6, z + 1.2, 0.12, 1.2, 0.12, C.log2).box(x + 0.8, y + 1.25, z + 1.2, 1.0, 0.6, 0.1, "#F5F0E6");
+      b.box(x + 0.8, y + 1.3, z + 1.26, 0.14, 0.32, 0.02, C.navy).box(x + 0.8, y + 1.07, z + 1.26, 0.12, 0.08, 0.02, C.navy);
     });
 
     // plaza: big campfire, log benches, the founder's hut and the sign
@@ -372,7 +400,8 @@
     sign.rotation.y = -0.6;
     group.add(sign);
 
-    return { group, houses, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS };
+    const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
+    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS };
   }
 
   root.OstrovIsland = { build, plotCell, look, LEVELS, FEATURES, PLOT };
