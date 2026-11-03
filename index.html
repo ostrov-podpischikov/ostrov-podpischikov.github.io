@@ -84,7 +84,7 @@
     .modal ol { margin: 6px 0 0 20px; display: grid; gap: 8px; font-size: 14px; font-weight: 600; line-height: 1.4; }
 
     .banner { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; font-size: 13px; font-weight: 700; }
-    .banner span { flex: 1; line-height: 1.3; }
+    .banner span { flex: 1; line-height: 1.3; cursor: pointer; }
     .banner .fold { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; width: 24px; }
     .banner .go { background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 900; padding: 10px 16px; border-radius: 12px; white-space: nowrap; }
     .banner.folded span, .banner.folded .go { display: none; }
@@ -166,8 +166,8 @@
     </div>
     <div class="panel banner" id="banner">
       <button class="fold" id="fold" aria-label="Свернуть">⌄</button>
-      <span id="bannerText">🗳 Голосование: как назовём остров? Голосуй комментом — итоги здесь</span>
-      <button class="go" id="openPoll">Голосовать</button>
+      <span id="bannerText">🗳 Голосование за название острова и новости — в нашем Telegram</span>
+      <a class="go" href="https://t.me/ostrovpodpischikov" target="_blank" rel="noopener">Перейти</a>
     </div>
     <div class="tools">
       <button class="panel tool" id="tTours"><span>📍</span>Экскурсии</button>
@@ -185,6 +185,7 @@
     <div class="dtop"><h2>ГОЛОСОВАНИЕ</h2><button class="x" data-shut="polls">×</button></div>
     <div id="pollBody"></div>
     <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 Проголосовать в Instagram</a>
+    <a class="btn dark full" href="https://t.me/ostrovpodpischikov" target="_blank" rel="noopener">✈️ Новости острова в Telegram</a>
   </div>
 
   <div class="panel drawer" id="growth">
@@ -478,7 +479,6 @@
     let polls = [];
     fetch("data/polls.json?v=" + Math.floor(Date.now() / 60000)).then((r) => (r.ok ? r.json() : [])).then((p) => {
       polls = p || [];
-      if (polls[0]) $("bannerText").textContent = `🗳 ${polls[0].question} Голосуй комментом`;
     }).catch(() => {});
     function renderPolls() {
       $("pollBody").innerHTML = polls.length ? polls.map((p) => {
@@ -492,7 +492,7 @@
           <div class="total">Голосов: ${fmt(p.total)} · обновляется каждые 15 минут</div></div>`;
       }).join("") : `<p class="how">Сейчас голосований нет — следи за рилсами 🏝</p>`;
     }
-    $("openPoll").onclick = () => { renderPolls(); openDrawer("polls"); };
+    $("bannerText").onclick = () => { renderPolls(); openDrawer("polls"); }; // the text opens the live tally, the button goes to Telegram
     document.querySelectorAll("[data-shut]").forEach((b) => (b.onclick = () => {
       $(b.dataset.shut).style.display = "none";
       if (b.dataset.shut === "growth") stopGrowth(true);
