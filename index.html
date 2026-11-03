@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=3"></script>
+  <script src="island.js?v=4"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -57,6 +57,8 @@
     .progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--muted); }
     .bar { flex: 1; height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
     .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 6px; transition: width 0.8s; }
+    .empty-info { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .empty-info:empty { display: none; }
     .link { border: 0; background: none; color: var(--accent); font: 800 12px "Montserrat", sans-serif; text-decoration: underline; cursor: pointer; white-space: nowrap; }
 
     #sheet { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); z-index: 5; padding: 16px; display: none; }
@@ -138,6 +140,7 @@
         <button class="link" id="lost">Не нашёл себя?</button>
       </div>
       <div class="progress"><div class="bar"><i id="bar"></i></div><span id="goal">…</span></div>
+      <div class="empty-info" id="emptyInfo"></div>
     </div>
     <div class="panel banner" id="banner">
       <button class="fold" id="fold" aria-label="Свернуть">⌄</button>
@@ -246,22 +249,25 @@
     const district = (ring) => DISTRICTS.find((d) => ring <= d[0])[1];
 
     // ── data and island
-    let island, residents = [];
+    let island, residents = [], emptyPlots = 0;
     function showIsland(list) {
       if (island) {
         scene.remove(island.group);
         island.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
       }
-      island = OstrovIsland.build(THREE, list);
+      // empty plots for followers without a comment, only on today's full island
+      island = OstrovIsland.build(THREE, list, { emptyPlots: list === residents ? emptyPlots : 0 });
       scene.add(island.group);
     }
     fetch("data/residents.json?v=" + Math.floor(Date.now() / 60000))
       .then((r) => r.json())
       .then((data) => {
         residents = data.residents || data;
+        emptyPlots = Math.max(0, Math.min(500, (data.followers || 0) - residents.length));
         showIsland(residents);
         const total = residents.length + 1;
         $("count").textContent = fmt(total);
+        if (emptyPlots) $("emptyInfo").textContent = `🚧 Пустых участков: ${fmt(emptyPlots)} — займи свой комментом`;
         $("day").textContent = dayOf(new Date().toISOString());
         const goal = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 1000000].find((g) => g > total);
         $("goal").textContent = "До " + fmt(goal) + ": ещё " + fmt(goal - total);
@@ -394,7 +400,7 @@
         selected = null;
         marker.visible = false;
         sheet.innerHTML = `<div class="top"><div class="nick">@${esc(nick)}</div><button class="x" data-close>×</button></div>
-          <p>Тебя пока нет на острове 🏝 Подпишись на @${IG} и напиши любой коммент под последним рилсом — через 15 минут здесь появится твой шалаш.</p>
+          <p>Тебя пока нет на острове 🏝 ${emptyPlots ? `Для подписчиков уже размечено ${fmt(emptyPlots)} пустых участков — ` : ""}подпишись на @${IG} и напиши любой коммент под последним рилсом: через 15 минут на участке вырастет твой шалаш.</p>
           <a class="btn yellow full" href="https://www.instagram.com/${IG}/" target="_blank" rel="noopener">Открыть Instagram</a>`;
         return;
       }
@@ -484,6 +490,7 @@
       if (wished.length) items.push(["🚩", "Исполненные желания", `${wished.length} ${plural(wished.length, "дом", "дома", "домов")} по просьбам из комментов`, () => find(wished[Math.floor(Math.random() * wished.length)].nick)]);
       if (top && top.level > 1) items.push([OstrovIsland.LEVELS[top.level - 1].emoji, "Лучший дом острова", "@" + top.nick + " · " + OstrovIsland.LEVELS[top.level - 1].name, () => find(top.nick)]);
       if (newest) items.push(["🏗", "Новые земли", "Здесь строятся самые свежие дома", () => find(newest.nick)]);
+      if (island.empty && island.empty.length) items.push(["🚧", "Пустые участки", `${island.empty.length} мест ждут подписчиков без коммента`, () => { const e = island.empty[0]; flyTo(e.clone().add(V(0, 1, 0)), e.clone().add(V(10, 12, 14))); }]);
       items.push(["🏝", "Весь остров", "Вид сверху", () => { const R = island.radius; flyTo(V(0, 2, 0), V(R * 0.9, R * 0.95 + 10, R * 1.25)); }]);
       const box = $("tourList");
       box.innerHTML = "";
