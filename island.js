@@ -46,6 +46,9 @@
   };
   const STRAW = [["#E0B04E", "#C8933A"], ["#C9A86A", "#A88848"], ["#D9C27A", "#B7A05C"], ["#B98552", "#8F6236"]];
   const CANVAS = [["#F5F0E6", "#2EC4B6"], ["#F5F0E6", "#E2483D"], ["#F2E3B3", "#2E86AB"], ["#EDE7DA", "#8E5BD9"]];
+  const WALLS = [["#C9A27A", "#B08A62"], ["#E8D3A9", "#CDB68A"], ["#9FC3E0", "#82A9C7"], ["#F2C86B", "#D9AE52"], ["#9ED9B8", "#80BF9C"], ["#F1E4CF", "#D6C8B0"]];
+  const MUD = [["#D9A066", "#C68B59"], ["#E6C9A0", "#CDAE82"], ["#E8D8C0", "#CFBFA5"], ["#C97B5A", "#A9603F"]];
+  const HULLS = [["#2E86AB", "#1F6E8E"], ["#E2483D", "#B93A31"], ["#3FA34D", "#2F8C3E"], ["#F4D35E", "#D9B840"], ["#F5F5F5", "#D8D8D8"]];
   const ROOFS = ["#D9452F", "#2E86AB", "#3FA34D", "#8E5BD9", "#F08A24", "#B23A48"];
   const ACCESSORIES = ["flag", "fire", "barrel", "chest", "surf", "hammock", "laundry", "torch", "pot"];
 
@@ -74,10 +77,10 @@
   }
 
   function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.xf = null; }
-  // boxes added after around(x, y, z, s) are scaled by s about that point; around() with no args resets
-  Builder.prototype.around = function (x, y, z, s) {
+  // boxes added after around(x, y, z, s, turn) are scaled by s and turned by turn about that point; around() with no args resets
+  Builder.prototype.around = function (x, y, z, s, turn) {
     const T = this.T;
-    this.xf = s && s !== 1 ? new T.Matrix4().makeTranslation(x, y, z).multiply(new T.Matrix4().makeScale(s, s, s)).multiply(new T.Matrix4().makeTranslation(-x, -y, -z)) : null;
+    this.xf = s ? new T.Matrix4().makeTranslation(x, y, z).multiply(new T.Matrix4().makeRotationY(turn || 0)).multiply(new T.Matrix4().makeScale(s, s, s)).multiply(new T.Matrix4().makeTranslation(-x, -y, -z)) : null;
     return this;
   };
   Builder.prototype.box = function (x, y, z, w, h, d, top, side, rotZ, rotY, rotX) {
@@ -139,7 +142,54 @@
       b.box(x, y + 0.7, z + 1.45, 0.12, 1.4, 0.12, C.log2).box(x, y + 0.7, z - 1.45, 0.12, 1.4, 0.12, C.log2);
       b.box(x, y + 0.45, z + 1.3, 0.7, 0.9, 0.04, "#3D2B1F");
     },
+    // хижина на сваях: posts, a deck, a little house with a straw roof, a ladder
+    (b, x, y, z, v) => {
+      [[-1.1, -1.0], [1.1, -1.0], [-1.1, 1.0], [1.1, 1.0]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log2));
+      b.box(x, y + 0.95, z, 2.7, 0.15, 2.5, C.plank, C.plank2);
+      b.box(x, y + 1.65, z - 0.15, 2.2, 1.25, 1.9, v.w, v.w2);
+      gable(b, x, y + 2.27, z - 0.15, 2.2, 1.9, v.c1, 0.85);
+      b.box(x, y + 1.5, z + 0.81, 0.55, 0.95, 0.06, C.door);
+      b.box(x - 0.3, y + 0.5, z + 1.45, 0.08, 1.0, 0.08, C.log).box(x + 0.3, y + 0.5, z + 1.45, 0.08, 1.0, 0.08, C.log);
+      for (let k = 0; k < 3; k++) b.box(x, y + 0.2 + k * 0.3, z + 1.45, 0.6, 0.06, 0.08, C.log);
+    },
+    // бунгало: plank walls, a porch on posts under the long roof
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.75, z - 0.3, 2.6, 1.5, 2.0, v.w, v.w2);
+      for (let k = 0; k < 3; k++) b.box(x, y + 0.35 + k * 0.45, z + 0.71, 2.62, 0.05, 0.02, v.w2);
+      gable(b, x, y + 1.5, z + 0.1, 2.6, 2.6, v.c1, 0.8);
+      b.box(x, y + 0.08, z + 1.15, 2.6, 0.16, 0.9, C.plank, C.plank2);
+      b.box(x - 1.15, y + 0.8, z + 1.5, 0.14, 1.5, 0.14, C.log2).box(x + 1.15, y + 0.8, z + 1.5, 0.14, 1.5, 0.14, C.log2);
+      b.box(x - 0.5, y + 0.6, z + 0.72, 0.55, 1.0, 0.06, C.door).box(x + 0.6, y + 0.9, z + 0.72, 0.6, 0.5, 0.06, C.glass);
+    },
+    // мазанка: a clay block, flat roof with beam ends, a jar on top
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.8, z, 2.6, 1.6, 2.4, v.m1, v.m2);
+      b.box(x, y + 1.68, z, 2.8, 0.16, 2.6, v.c2);
+      for (let k = -1; k <= 1; k++) b.box(x + k * 0.8, y + 1.45, z + 1.3, 0.14, 0.14, 0.4, C.log2);
+      b.box(x - 0.45, y + 0.55, z + 1.21, 0.6, 1.1, 0.06, C.door).box(x + 0.65, y + 1.0, z + 1.21, 0.45, 0.45, 0.06, C.dark);
+      b.box(x + 0.8, y + 1.98, z - 0.6, 0.4, 0.45, 0.4, "#C0613C");
+    },
+    // дом-лодка: an upturned hull on the sand, plank front with a round window
+    (b, x, y, z, v) => {
+      [2.8, 2.6, 2.2, 1.6, 0.8].forEach((w, k) => b.box(x, y + 0.2 + k * 0.4, z, w, 0.4, 3.0 - k * 0.1, k % 2 ? v.h2 : v.h1));
+      b.box(x, y + 2.1, z, 0.2, 0.15, 3.2, C.log2);
+      b.box(x, y + 0.75, z + 1.52, 1.8, 1.5, 0.06, C.plank2);
+      b.box(x, y + 0.55, z + 1.56, 0.55, 1.0, 0.04, C.door).box(x, y + 1.4, z + 1.56, 0.35, 0.35, 0.04, C.glass);
+    },
+    // пляжный домик: a deck, posts, small walls and a stepped straw roof
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.1, z, 3.0, 0.2, 3.0, C.plank, C.plank2);
+      b.box(x, y + 0.85, z, 2.0, 1.3, 2.0, v.w, v.w2);
+      [[-1.35, -1.35], [1.35, -1.35], [-1.35, 1.35], [1.35, 1.35]].forEach(([a, c]) => b.box(x + a, y + 0.9, z + c, 0.14, 1.5, 0.14, C.log));
+      b.box(x, y + 1.7, z, 3.3, 0.25, 3.3, v.c1, v.c2).box(x, y + 2.0, z, 2.5, 0.3, 2.5, v.c2, v.c1).box(x, y + 2.3, z, 1.6, 0.3, 1.6, v.c1, v.c2).box(x, y + 2.55, z, 0.7, 0.25, 0.7, v.c2);
+      b.box(x, y + 0.65, z + 1.01, 0.55, 1.0, 0.06, C.door);
+    },
   ];
+  const HUT_KINDS = [
+    { name: "Шалаш", emoji: "⛺" }, { name: "Вигвам", emoji: "🛖" }, { name: "Круглая хижина", emoji: "🛖" }, { name: "Палатка", emoji: "⛺" },
+    { name: "Хижина на сваях", emoji: "🛖" }, { name: "Бунгало", emoji: "🏡" }, { name: "Мазанка", emoji: "🏠" }, { name: "Дом-лодка", emoji: "🛶" }, { name: "Пляжный домик", emoji: "🏖" },
+  ];
+  const HUT_H = [2.2, 3.4, 2.6, 1.6, 3.3, 2.4, 2.2, 2.2, 2.7];
 
   // ── yard items; slot gives the spot on the pad
   const SLOTS = [[1.75, 1.55], [-1.75, 1.55], [1.75, -1.6], [-1.75, -1.6]];
@@ -353,16 +403,20 @@
   function look(r) {
     const n = r.nick, wish = r.wish || [];
     const straw = pick(STRAW, strHash(n, 1)), canvas = pick(CANVAS, strHash(n, 2));
+    const wall = pick(WALLS, strHash(n, 7)), mud = pick(MUD, strHash(n, 8)), hull = pick(HULLS, strHash(n, 9));
     const colorWish = wish.find((w) => COLORS[w]);
     const v = {
       hut: Math.floor(strHash(n, 3) * HUTS.length),
+      turn: Math.floor(strHash(n, 41) * 4) * Math.PI / 2,
       c1: straw[0], c2: straw[1], t1: canvas[0], t2: canvas[1],
+      w: wall[0], w2: wall[1], m1: mud[0], m2: mud[1], h1: hull[0], h2: hull[1],
       roof: colorWish ? COLORS[colorWish] : pick(ROOFS, strHash(n, 4)),
       flag: colorWish ? COLORS[colorWish] : pick(Object.values(COLORS), strHash(n, 5)),
       items: [],
     };
     if (colorWish && v.hut === 3) v.t2 = COLORS[colorWish];
-    if (colorWish && v.hut !== 3) { v.c1 = COLORS[colorWish]; }
+    if (colorWish && v.hut === 7) { v.h1 = COLORS[colorWish]; }
+    else if (colorWish && v.hut !== 3) { v.c1 = COLORS[colorWish]; }
     wish.forEach((w) => { if (ITEMS[w] && !v.items.includes(w)) v.items.push(w); });
     // one or two random yard items on top of the wished ones, four at most
     const want = Math.min(4, v.items.length + 1 + (strHash(n, 6) < 0.45 ? 1 : 0));
@@ -416,8 +470,13 @@
     const lastNo = rows.length ? rows[rows.length - 1].no : 1;
     const emptyCells = [];
     for (let k = 1; k <= (opts.emptyPlots || 0); k++) { const c = plotCell(lastNo + k); far = Math.max(far, c[2]); emptyCells.push(c); }
-    const R = Math.max(18, (far + 1) * PLOT + 7);
-    const grassR = R - 6;
+    // the coast: never closer than Rb (the outer plots keep their grass), bulging into capes elsewhere
+    const Rb = Math.max(18, (far + 0.5) * PLOT + 9);
+    const wave = (a) => 0.5 * Math.sin(2 * a + 1.3) + 0.3 * Math.sin(3 * a + 4.1) + 0.2 * Math.sin(5 * a + 2.2) + 0.12 * Math.sin(7 * a + 0.7);
+    const coast = (a) => Rb * (1 + 0.32 * Math.max(0, wave(a) + 0.25));
+    const coastAt = (x, z) => coast(Math.atan2(z, x));
+    let R = Rb;
+    for (let k = 0; k < 360; k++) R = Math.max(R, coast((k / 360) * Math.PI * 2));
     const occupied = new Set(cells.map((c) => c[0] + "," + c[1]));
     emptyCells.forEach((c) => occupied.add(c[0] + "," + c[1]));
     occupied.add("0,0");
@@ -428,9 +487,9 @@
     const n = Math.ceil(R / TERRAIN) + 1;
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
       const x = i * TERRAIN, z = j * TERRAIN;
-      const r = Math.hypot(x, z) + (hash(i, j) - 0.5) * 2.4;
-      if (r > R) continue;
-      const grass = r < grassR, top = grass ? 2 : 1;
+      const r = Math.hypot(x, z) + (hash(i, j) - 0.5) * 2.4, edge = coastAt(x, z);
+      if (r > edge) continue;
+      const grass = r < edge - 6, top = grass ? 2 : 1;
       const ct = grass ? (hash(i * 3, j) < 0.5 ? C.grass : C.grass2) : (hash(i, j * 2) < 0.5 ? C.sand : C.sand2);
       terrain.box(x, (top - 3) / 2, z, TERRAIN, top + 3, TERRAIN, ct, grass ? C.soil : C.sand2);
       tops.set(i + "," + j, top);
@@ -438,7 +497,13 @@
     const topAt = (x, z) => tops.get(Math.round(x / TERRAIN) + "," + Math.round(z / TERRAIN)) || 0;
     group.add(terrain.mesh());
 
-    const shallows = new THREE.Mesh(new THREE.CircleGeometry(R + 6, 64), new THREE.MeshLambertMaterial({ color: "#46C4DE" }));
+    // shallows follow the coast; shape points are (x, -z) because the mesh is laid flat with rotation.x = -π/2
+    const rim = new THREE.Shape();
+    for (let k = 0; k <= 128; k++) {
+      const a = (k / 128) * Math.PI * 2, rr = coast(a) + 6;
+      if (k) rim.lineTo(Math.cos(a) * rr, -Math.sin(a) * rr); else rim.moveTo(Math.cos(a) * rr, -Math.sin(a) * rr);
+    }
+    const shallows = new THREE.Mesh(new THREE.ShapeGeometry(rim), new THREE.MeshLambertMaterial({ color: "#46C4DE" }));
     shallows.rotation.x = -Math.PI / 2;
     shallows.position.y = 0.02;
     shallows.receiveShadow = true;
@@ -476,7 +541,8 @@
       b.box(x, y + 0.03, z, PLOT - STREET, 0.06, PLOT - STREET, biz ? C.stone : C.pad);
       // a business replaces the hut; its own props stand where the yard items would be
       const draw = (bb, ox, oz) => {
-        bb.around(ox, y0(bb), oz, HOUSE);
+        // a business always faces +z so its sign reads from the street; huts face any side
+        bb.around(ox, y0(bb), oz, HOUSE, biz ? 0 : v.turn);
         if (biz) { biz.draw(bb, ox, y0(bb), oz, v); bb.around(); return; }
         MODELS[lvl - 1](bb, ox, y0(bb), oz, v);
         bb.around();
@@ -515,7 +581,8 @@
         mesh,
         no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo,
         features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
-        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : HEIGHT[lvl - 1]) * HOUSE + 0.6, z),
+        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : lvl === 1 ? HUT_H[v.hut] : HEIGHT[lvl - 1]) * HOUSE + 0.6, z),
+        kind: !biz && lvl === 1 ? HUT_KINDS[v.hut] : null,
       });
     });
 
@@ -539,13 +606,13 @@
     b.box(0, 2.2, 0, 1.6, 0.25, 0.35, C.log2, C.log2, 0, 0.5).box(0, 2.2, 0, 1.6, 0.25, 0.35, C.log2, C.log2, 0, -0.5).box(0, 2.2, 0, 1.6, 0.25, 0.35, C.log, C.log, 0, Math.PI / 2);
     b.box(0, 2.55, 0, 0.8, 0.6, 0.8, C.flame).box(0, 3.05, 0, 0.5, 0.5, 0.5, C.flame2).box(0.1, 3.4, 0.05, 0.25, 0.3, 0.25, "#FFF3B0");
     [[0, 2.3, 0], [2.3, 0, Math.PI / 2], [0, -2.3, 0], [-2.3, 0, Math.PI / 2]].forEach(([xx, zz, ry]) => b.box(xx, 2.25, zz, 1.8, 0.4, 0.45, C.log, C.log2, 0, ry));
-    shalash(b, -2.0, 2, -2.0, 0.8, STRAW[0][0], STRAW[0][1]);
+    shalash(b, -2.0, 2, -2.0, 1.1, STRAW[0][0], STRAW[0][1]);
 
     // empty cells: palms, flowers, rocks; beach palms around the edge
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
       if (occupied.has(i + "," + j)) continue;
       const x = i * PLOT, z = j * PLOT, d = Math.hypot(x, z);
-      if (d > R - 2) continue;
+      if (d > coastAt(x, z) - 2) continue;
       const h = hash(i + 7, j - 3), top = topAt(x, z);
       if (!top) continue;
       if (top === 1 ? h < 0.55 : h < 0.4) palm(b, x + (hash(j, i) - 0.5) * 2, top, z + (hash(i, j) - 0.5) * 2, 5 + Math.floor(hash(j, i) * 3), hash(i, j + 9) < 0.5 ? 1 : -1);
@@ -554,7 +621,7 @@
     }
 
     // pier with a boat, on the +z beach
-    const pz = R - 4;
+    const pz = coast(Math.PI / 2) - 4;
     for (let k = 0; k < 9; k++) b.box(2.5, 1.15, pz + k * 1.05, 1.9, 0.18, 1.0, k % 2 ? C.plank : C.plank2);
     for (let k = 0; k < 9; k += 2) b.box(1.6, 0.6, pz + k * 1.05, 0.2, 1.2, 0.2, C.log2).box(3.4, 0.6, pz + k * 1.05, 0.2, 1.2, 0.2, C.log2);
     b.box(4.6, 0.3, pz + 6, 1.1, 0.5, 2.8, "#9C6B3C").box(4.6, 0.6, pz + 6, 0.8, 0.12, 2.4, "#C79A62").box(4.6, 1.4, pz + 6, 0.1, 1.6, 0.1, C.log2).box(4.6, 1.5, pz + 6.4, 0.05, 1.1, 0.8, "#FFFFFF");
@@ -562,13 +629,14 @@
 
     const sign = new THREE.Group();
     const post = new Builder(THREE);
-    post.box(-1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(0, 2.45, -0.12, 3.4, 2.5, 0.2, "#7A4F2A");
+    post.box(-1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(0, 2.45, 0.28, 3.4, 2.5, 0.2, "#7A4F2A");
     sign.add(post.mesh());
     const face = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 2.45), new THREE.MeshLambertMaterial({ map: signTexture(THREE, rows.length + 1) }));
-    face.position.set(0, 2.45, 0.01);
+    // the board hangs in front of the posts, otherwise they cover the edges of «ЖИТЕЛЕЙ: N»
+    face.position.set(0, 2.45, 0.39);
     sign.add(face);
-    sign.scale.setScalar(0.8);
-    sign.position.set(2.0, 2, -2.2);
+    sign.scale.setScalar(1.3);
+    sign.position.set(1.9, 2, -2.4);
     sign.rotation.y = -0.6;
     group.add(sign);
 
