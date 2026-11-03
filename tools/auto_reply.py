@@ -25,7 +25,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 MAX_PER_RUN = 15
-START = os.environ.get("AUTO_REPLY_SINCE", "2026-11-03T12:00:00")  # only comments after this get a reply
+START = os.environ.get("AUTO_REPLY_SINCE") or "2026-11-03T06:20:00"  # UTC; only comments after this get a reply
 OWN = "ostrov.podpischikov"
 TEMPLATES = [
     "@{nick}, твой дом №{no} уже стоит на острове 🏝 Найди его по ссылке в шапке",
