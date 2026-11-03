@@ -249,8 +249,9 @@
     ocean.receiveShadow = true;
     scene.add(ocean);
 
-    // map-style: one finger / left mouse drags the island, two fingers zoom and turn, right mouse tilts
+    // map-style: one finger / left mouse drags the island, two fingers only zoom (no turning by accident), right mouse tilts
     const controls = new THREE.MapControls(camera, canvas);
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
     controls.enableDamping = true;
     controls.dampingFactor = 0.12;
     controls.screenSpacePanning = false;
@@ -326,6 +327,11 @@
       });
 
     // ── camera flights
+    // a point in front of the house door: dist ahead, up high, side a little to the right so the house shows depth
+    function front(h, dist, up, side) {
+      const f = h.face || 0, s = Math.sin(f), c = Math.cos(f);
+      return h.pos.clone().add(new THREE.Vector3(s * dist + c * side, up, c * dist - s * side));
+    }
     let flight = null;
     function flyTo(target, pos, dur = 1.6) {
       if (!dur) { controls.target.copy(target); camera.position.copy(pos); controls.update(); return; }
@@ -449,7 +455,7 @@
       marker.visible = true;
       marker.userData.y = h.top.y + 2.2;
       marker.position.set(h.top.x, marker.userData.y, h.top.z);
-      flyTo(h.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), h.pos.clone().add(new THREE.Vector3(5, 13, 9)));
+      flyTo(h.pos.clone().add(new THREE.Vector3(0, 2.5, 0)), front(h, 15, 12, 4));
       const lv = OstrovIsland.LEVELS[h.level - 1];
       const r = residents.find((x) => x.nick === nick) || {};
       const day = dayOf(r.since);
@@ -607,8 +613,8 @@
       r2.setSize(920, 780, false);
       r2.shadowMap.enabled = true;
       const cam = new THREE.PerspectiveCamera(38, 920 / 780, 0.1, 3000);
-      cam.position.copy(h.pos).add(new THREE.Vector3(7, 6, 9));
-      cam.lookAt(h.pos.clone().add(new THREE.Vector3(0, 1.4, 0)));
+      cam.position.copy(front(h, 12, 8, 3.5));
+      cam.lookAt(h.pos.clone().add(new THREE.Vector3(0, 2.6, 0)));
       marker.visible = true;
       marker.position.set(h.top.x, h.top.y + 2.2, h.top.z);
       r2.render(scene, cam);
