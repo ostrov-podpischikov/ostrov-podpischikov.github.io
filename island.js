@@ -37,6 +37,7 @@
     log: "#8A5530", log2: "#6E4123", door: "#4A2F17", glass: "#9FE3FF", cream: "#F1D3A1", stone: "#9AA0A6",
     stone2: "#7D838A", pool: "#3FC1E0", pad: "#E3CF94", path: "#D2B77A", path2: "#C9AC6C", flower: "#FF7AA8",
     fl2: "#FFE066", rope: "#D8C9A3", flame: "#FF8C1A", flame2: "#FFD23F", plank: "#B98552", plank2: "#A87443",
+    navy: "#0B3954", dark: "#2B2D42", metal: "#8D99AE", gold: "#F4C430", brick: "#B5523B",
   };
   const STRAW = [["#E0B04E", "#C8933A"], ["#C9A86A", "#A88848"], ["#D9C27A", "#B7A05C"], ["#B98552", "#8F6236"]];
   const CANVAS = [["#F5F0E6", "#2EC4B6"], ["#F5F0E6", "#E2483D"], ["#F2E3B3", "#2E86AB"], ["#EDE7DA", "#8E5BD9"]];
@@ -204,6 +205,138 @@
   ];
   const HEIGHT = [2.6, 2.6, 3.0, 3.3, 4.2, 3.4, 8.6];
 
+  // ── businesses: a resident who asked for one in a comment gets it instead of a hut.
+  // Every model faces +z; the sign board hangs at SIGN_Z in front, its height is h + 0.45.
+  const SIGN_Z = 1.08;
+  function shopBox(b, x, y, z, wall, aw1, aw2, h) {
+    h = h || 2.2;
+    b.box(x, y + h / 2, z - 0.3, 3.2, h, 2.6, wall);
+    b.box(x, y + h + 0.06, z - 0.3, 3.4, 0.12, 2.8, "#D7DEE2");
+    for (let k = 0; k < 6; k++) b.box(x - 1.35 + k * 0.54, y + h - 0.45, z + 1.3, 0.54, 0.1, 0.75, k % 2 ? aw2 : aw1, k % 2 ? aw2 : aw1, 0, 0, 0.35);
+    b.box(x - 0.7, y + 0.6, z + 1.02, 0.65, 1.2, 0.06, C.door).box(x + 0.6, y + 0.85, z + 1.02, 1.2, 0.9, 0.06, C.glass);
+  }
+  function umbrella(b, x, y, z, c1, c2) {
+    b.box(x, y + 0.35, z, 0.7, 0.08, 0.7, C.plank).box(x, y + 0.18, z, 0.1, 0.35, 0.1, C.log2);
+    b.box(x, y + 0.75, z, 0.06, 1.5, 0.06, "#EEEEEE").box(x, y + 1.45, z, 1.4, 0.1, 1.4, c1).box(x, y + 1.55, z, 0.8, 0.1, 0.8, c2);
+  }
+  const BIZ = {
+    shop: { title: "Магазин", emoji: "🛒", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.cream, "#3FA34D", "#FFFFFF");
+      b.box(x + 1.0, y + 0.25, z + 1.9, 0.6, 0.5, 0.5, C.plank).box(x + 1.0, y + 0.55, z + 1.9, 0.5, 0.12, 0.4, "#E2483D").box(x + 0.3, y + 0.25, z + 1.9, 0.6, 0.5, 0.5, C.plank2).box(x + 0.3, y + 0.55, z + 1.9, 0.5, 0.12, 0.4, "#F08A24");
+    } },
+    cafe: { title: "Кафе", emoji: "☕", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, "#F6E7D0", "#E2483D", "#FFFFFF");
+      umbrella(b, x - 1.1, y, z + 2.1, "#E2483D", "#FFFFFF"); umbrella(b, x + 1.1, y, z + 2.1, "#2EC4B6", "#FFFFFF");
+    } },
+    shawarma: { title: "Шаурма", emoji: "🌯", h: 2.0, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, "#F4D35E", "#E2483D", "#F4D35E", 2.0);
+      for (let k = 0; k < 5; k++) b.box(x + 0.6, y + 0.55 + k * 0.16, z + 1.15, 0.42 - Math.abs(k - 2) * 0.06, 0.16, 0.42 - Math.abs(k - 2) * 0.06, k % 2 ? "#A0522D" : "#C8793B");
+      b.box(x + 0.6, y + 0.85, z + 1.15, 0.05, 1.1, 0.05, C.metal).box(x, y + 0.5, z + 1.5, 3.0, 0.1, 0.5, C.metal, "#6C757D");
+    } },
+    pizza: { title: "Пиццерия", emoji: "🍕", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.brick, "#3FA34D", "#FFFFFF");
+      b.box(x - 0.9, y + 2.7, z - 0.8, 1.2, 0.8, 1.2, C.stone, C.stone2).box(x - 0.9, y + 3.4, z - 0.8, 0.4, 0.8, 0.4, C.stone2);
+      b.box(x + 1.0, y + 2.45, z - 0.6, 1.0, 0.1, 1.0, "#F4C27A").box(x + 1.0, y + 2.52, z - 0.6, 0.8, 0.05, 0.8, "#E2483D");
+    } },
+    sushi: { title: "Суши", emoji: "🍣", h: 2.2, draw: (b, x, y, z) => {
+      b.box(x, y + 1.1, z - 0.3, 3.2, 2.2, 2.6, C.white);
+      b.box(x, y + 2.35, z - 0.3, 4.0, 0.25, 3.4, "#B23A48").box(x, y + 2.6, z - 0.3, 3.0, 0.25, 2.4, "#B23A48").box(x, y + 2.85, z - 0.3, 1.6, 0.25, 1.4, C.dark);
+      b.box(x - 0.7, y + 0.6, z + 1.02, 0.65, 1.2, 0.06, C.dark).box(x + 0.6, y + 0.9, z + 1.02, 1.1, 0.8, 0.06, C.glass);
+      [-1.7, 1.7].forEach((dx) => b.box(x + dx, y + 1.7, z + 1.1, 0.4, 0.55, 0.4, "#E2483D").box(x + dx, y + 2.05, z + 1.1, 0.06, 0.2, 0.06, C.dark));
+    } },
+    burger: { title: "Бургерная", emoji: "🍔", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, "#F7C04A", "#E2483D", "#FFFFFF");
+      b.box(x, y + 2.45, z - 0.5, 1.6, 0.35, 1.6, "#D9913C").box(x, y + 2.72, z - 0.5, 1.75, 0.12, 1.75, "#5DB03F").box(x, y + 2.9, z - 0.5, 1.6, 0.25, 1.6, "#6E3B1E").box(x, y + 3.05, z - 0.5, 1.7, 0.08, 1.7, "#F4D35E").box(x, y + 3.3, z - 0.5, 1.5, 0.45, 1.5, "#D9913C");
+    } },
+    icecream: { title: "Мороженое", emoji: "🍦", h: 2.0, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, "#FFD1E0", "#FF7AA8", "#FFFFFF", 2.0);
+      for (let k = 0; k < 4; k++) b.box(x, y + 2.3 + k * 0.3, z - 0.5, 0.25 + k * 0.18, 0.3, 0.25 + k * 0.18, "#D9A15B");
+      b.box(x, y + 3.6, z - 0.5, 1.0, 0.5, 1.0, "#FFF4E0").box(x, y + 4.0, z - 0.5, 0.75, 0.4, 0.75, "#FF7AA8").box(x, y + 4.3, z - 0.5, 0.25, 0.25, 0.25, "#E2483D");
+    } },
+    bar: { title: "Пляжный бар", emoji: "🍹", h: 2.4, draw: (b, x, y, z, v) => {
+      [[-1.4, -1.2], [1.4, -1.2], [-1.4, 0.9], [1.4, 0.9]].forEach(([a, c]) => b.box(x + a, y + 1.2, z + c, 0.22, 2.4, 0.22, C.log2));
+      b.box(x, y + 2.5, z - 0.15, 3.8, 0.3, 3.1, v.c1, v.c2).box(x, y + 2.8, z - 0.15, 2.8, 0.3, 2.2, v.c2, v.c1).box(x, y + 3.05, z - 0.15, 1.6, 0.25, 1.2, v.c1);
+      b.box(x, y + 0.55, z + 0.6, 2.8, 1.1, 0.4, C.plank, C.plank2).box(x, y + 1.15, z + 0.6, 3.0, 0.1, 0.6, C.log);
+      [-0.9, 0, 0.9].forEach((dx) => b.box(x + dx, y + 0.35, z + 1.3, 0.35, 0.7, 0.35, C.log2).box(x + dx, y + 1.3, z + 0.6, 0.12, 0.25, 0.12, dx ? "#FF7AA8" : "#F4D35E"));
+      ITEMS.torch(b, x - 2.0, y, z + 1.6); ITEMS.torch(b, x + 2.0, y, z + 1.6);
+    } },
+    fish: { title: "Рыбная лавка", emoji: "🐟", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.plank, "#2E86AB", "#FFFFFF");
+      [-0.9, 0.1, 1.1].forEach((dx) => { b.box(x + dx, y + 0.3, z + 1.9, 0.8, 0.6, 0.6, C.plank2); b.box(x + dx, y + 0.65, z + 1.9, 0.6, 0.12, 0.15, "#7FB7D9").box(x + dx, y + 0.65, z + 2.05, 0.6, 0.12, 0.15, "#9AC8E3"); });
+      b.box(x - 1.7, y + 1.2, z + 0.2, 0.05, 1.6, 1.6, C.rope);
+    } },
+    hotel: { title: "Отель", emoji: "🏨", h: 5.4, draw: (b, x, y, z, v) => {
+      b.box(x, y + 2.7, z - 0.5, 3.4, 5.4, 2.6, C.white);
+      b.box(x, y + 5.5, z - 0.5, 3.6, 0.2, 2.8, v.roof);
+      for (let f = 0; f < 3; f++) for (let k = -1; k <= 1; k++) {
+        const yy = y + 1.0 + f * 1.6;
+        b.box(x + k * 1.05, yy, z + 0.82, 0.6, 0.7, 0.06, C.glass);
+        if (f) b.box(x + k * 1.05, yy - 0.45, z + 1.0, 0.8, 0.08, 0.4, "#D7DEE2").box(x + k * 1.05, yy - 0.3, z + 1.18, 0.8, 0.25, 0.04, v.roof);
+      }
+      b.box(x, y + 0.5, z + 0.82, 0.8, 1.0, 0.06, C.door);
+      b.box(x + 1.4, y + 0.08, z + 1.9, 1.6, 0.16, 1.1, C.pool, "#CFE7EE");
+    } },
+    cinema: { title: "Кинотеатр", emoji: "🎬", h: 2.8, draw: (b, x, y, z) => {
+      b.box(x, y + 1.4, z - 0.3, 3.4, 2.8, 2.6, C.navy);
+      b.box(x, y + 2.85, z - 0.3, 3.6, 0.12, 2.8, "#E2483D");
+      for (let k = 0; k < 7; k++) b.box(x - 1.5 + k * 0.5, y + 2.95, z + 1.02, 0.14, 0.14, 0.08, C.lamp);
+      b.box(x - 0.9, y + 1.1, z + 1.0, 0.8, 1.2, 0.06, "#F4D35E").box(x + 0.9, y + 1.1, z + 1.0, 0.8, 1.2, 0.06, "#2EC4B6").box(x, y + 0.6, z + 1.0, 0.7, 1.2, 0.06, C.dark);
+    } },
+    surf: { title: "Сёрф-станция", emoji: "🏄", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, "#2EC4B6", "#F4D35E", "#FFFFFF");
+      ["#E2483D", "#F4D35E", "#8E5BD9", "#FF7AA8"].forEach((c, k) => b.box(x - 1.3 + k * 0.85, y + 1.0, z + 1.45, 0.5, 2.0, 0.1, c, "#FFFFFF", 0.12 - k * 0.08, 0, -0.18));
+    } },
+    bank: { title: "Банк", emoji: "🏦", h: 2.6, draw: (b, x, y, z) => {
+      b.box(x, y + 0.15, z - 0.1, 3.6, 0.3, 3.0, C.stone);
+      b.box(x, y + 1.4, z - 0.5, 3.2, 2.4, 2.0, "#E5E5E5");
+      for (let k = 0; k < 4; k++) b.box(x - 1.2 + k * 0.8, y + 1.4, z + 0.85, 0.3, 2.3, 0.3, C.white);
+      b.box(x, y + 2.7, z + 0.2, 3.6, 0.25, 1.6, C.white).box(x, y + 3.0, z + 0.2, 2.6, 0.35, 1.4, "#E5E5E5").box(x, y + 3.3, z + 0.2, 1.4, 0.3, 1.2, C.gold);
+      b.box(x, y + 0.7, z + 0.52, 0.8, 1.1, 0.06, C.door);
+    } },
+    farm: { title: "Ферма", emoji: "🌾", h: 2.4, draw: (b, x, y, z) => {
+      b.box(x - 0.6, y + 1.0, z - 0.8, 2.2, 2.0, 2.0, "#B23A48");
+      gable(b, x - 0.6, y + 2.0, z - 0.8, 2.2, 2.0, C.dark, 0.9);
+      b.box(x - 0.6, y + 0.65, z + 0.22, 1.0, 1.3, 0.06, C.white).box(x - 0.6, y + 0.65, z + 0.25, 1.0, 0.08, 0.04, C.white, C.white, 0.9).box(x - 0.6, y + 0.65, z + 0.25, 1.0, 0.08, 0.04, C.white, C.white, -0.9);
+      for (let k = 0; k < 3; k++) for (let m = 0; m < 3; m++) b.box(x + 1.3 + m * 0.5, y + 0.25, z - 1.4 + k * 0.9, 0.3, 0.5, 0.6, k === 1 ? "#F4D35E" : "#5DB03F");
+      b.box(x + 1.6, y + 0.3, z + 2.2, 0.3, 0.25, 0.5, C.white).box(x + 1.6, y + 0.55, z + 2.45, 0.2, 0.2, 0.2, C.white);
+    } },
+    pharmacy: { title: "Аптека", emoji: "💊", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.white, "#3FA34D", "#FFFFFF");
+      b.box(x + 1.75, y + 1.8, z + 0.4, 0.1, 0.9, 0.3, "#3FA34D").box(x + 1.75, y + 1.8, z + 0.4, 0.1, 0.3, 0.9, "#3FA34D");
+    } },
+    barber: { title: "Барбершоп", emoji: "💈", h: 2.2, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.dark, "#E2483D", "#FFFFFF");
+      for (let k = 0; k < 6; k++) b.box(x - 1.7, y + 0.4 + k * 0.25, z + 1.15, 0.25, 0.25, 0.25, ["#E2483D", "#FFFFFF", "#2E86AB"][k % 3]);
+    } },
+    gym: { title: "Спортзал", emoji: "🏋", h: 2.4, draw: (b, x, y, z) => {
+      shopBox(b, x, y, z, C.metal, C.dark, "#F08A24", 2.4);
+      b.box(x, y + 2.75, z - 0.5, 2.0, 0.12, 0.12, C.dark).box(x - 0.9, y + 2.75, z - 0.5, 0.2, 0.6, 0.6, C.dark).box(x + 0.9, y + 2.75, z - 0.5, 0.2, 0.6, 0.6, C.dark);
+    } },
+    garage: { title: "Автосервис", emoji: "🔧", h: 2.4, draw: (b, x, y, z, v) => {
+      b.box(x, y + 1.2, z - 0.3, 3.4, 2.4, 2.6, C.metal);
+      b.box(x, y + 2.46, z - 0.3, 3.6, 0.12, 2.8, C.dark);
+      for (let k = 0; k < 6; k++) b.box(x - 0.4, y + 0.2 + k * 0.3, z + 1.02, 1.8, 0.24, 0.06, "#D7DEE2");
+      b.box(x + 1.3, y + 0.35, z + 2.0, 0.9, 0.4, 1.7, v.roof).box(x + 1.3, y + 0.75, z + 1.9, 0.8, 0.4, 0.9, C.glass);
+      [[-0.45, -0.6], [0.45, -0.6], [-0.45, 0.6], [0.45, 0.6]].forEach(([a, c]) => b.box(x + 1.3 + a, y + 0.18, z + 2.0 + c, 0.12, 0.35, 0.35, C.dark));
+    } },
+  };
+
+  function bizSignTexture(THREE, biz, label) {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 136;
+    const g = c.getContext("2d");
+    g.fillStyle = "#0B3954"; g.fillRect(0, 0, 512, 136);
+    g.fillStyle = "#F4D35E"; g.fillRect(0, 0, 512, 8); g.fillRect(0, 128, 512, 8);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "900 52px Montserrat, sans-serif"; g.fillStyle = "#FFFFFF";
+    g.fillText(biz.emoji + " " + biz.title.toUpperCase(), 256, 50, 490);
+    g.font = "800 32px Montserrat, sans-serif"; g.fillStyle = "#F4D35E";
+    g.fillText(label, 256, 104, 490);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
   /** Appearance of one resident: stable for a nick, wishes from comments add details. */
   function look(r) {
     const n = r.nick, wish = r.wish || [];
@@ -326,24 +459,42 @@
       const x = i * PLOT, z = j * PLOT, y = 2;
       const lvl = Math.min(7, Math.max(1, r.level || 1));
       const v = look(r);
-      b.box(x, y + 0.03, z, 5.4, 0.06, 5.4, C.pad);
-      let mesh = null;
+      const biz = BIZ[r.biz];
+      b.box(x, y + 0.03, z, 5.4, 0.06, 5.4, biz ? C.stone : C.pad);
+      // a business replaces the hut; its own props stand where the yard items would be
+      const draw = (bb, ox, oz) => {
+        if (biz) { biz.draw(bb, ox, y0(bb), oz, v); return; }
+        MODELS[lvl - 1](bb, ox, y0(bb), oz, v);
+        v.items.forEach((it, s) => ITEMS[it](bb, ox + SLOTS[s][0], y0(bb), oz + SLOTS[s][1], v));
+      };
+      const y0 = (bb) => (bb === b ? y : 0);
+      let mesh = null, signHost = group, sx = x, sy = y, sz = z;
       if (opts.perHouse) {
         const hb = new Builder(THREE);
-        MODELS[lvl - 1](hb, 0, 0, 0, v);
-        v.items.forEach((it, s) => ITEMS[it](hb, SLOTS[s][0], 0, SLOTS[s][1], v));
+        draw(hb, 0, 0);
         mesh = hb.mesh();
         mesh.position.set(x, y, z);
         group.add(mesh);
-      } else {
-        MODELS[lvl - 1](b, x, y, z, v);
-        v.items.forEach((it, s) => ITEMS[it](b, x + SLOTS[s][0], y, z + SLOTS[s][1], v));
+        signHost = mesh; sx = 0; sy = 0; sz = 0;
+      } else draw(b, x, z);
+      let bizInfo = null;
+      if (biz) {
+        const label = r.brand ? "«" + r.brand + "»" : "@" + r.nick;
+        // the sign: a dark board on two posts in front of the building, facing the street
+        const sb = new Builder(THREE);
+        sb.box(sx - 1.45, sy + (biz.h + 0.45) / 2, sz + SIGN_Z - 0.05, 0.12, biz.h + 0.45, 0.12, C.log2).box(sx + 1.45, sy + (biz.h + 0.45) / 2, sz + SIGN_Z - 0.05, 0.12, biz.h + 0.45, 0.12, C.log2);
+        sb.box(sx, sy + biz.h + 0.45, sz + SIGN_Z - 0.03, 3.1, 0.86, 0.08, C.navy);
+        signHost.add(sb.mesh());
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.8), new THREE.MeshBasicMaterial({ map: bizSignTexture(THREE, biz, label) }));
+        face.position.set(sx, sy + biz.h + 0.45, sz + SIGN_Z + 0.02);
+        signHost.add(face);
+        bizInfo = { kind: r.biz, title: biz.title, emoji: biz.emoji, label };
       }
       houses.set(r.nick, {
         mesh,
-        no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d,
-        features: v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0,
-        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + HEIGHT[lvl - 1] + 0.6, z),
+        no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo,
+        features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
+        pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : HEIGHT[lvl - 1]) + 0.6, z),
       });
     });
 
@@ -404,5 +555,5 @@
     return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS };
   }
 
-  root.OstrovIsland = { build, plotCell, look, LEVELS, FEATURES, PLOT };
+  root.OstrovIsland = { build, plotCell, look, LEVELS, FEATURES, PLOT, BIZ };
 })(typeof window !== "undefined" ? window : globalThis);
