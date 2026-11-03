@@ -596,6 +596,7 @@
         features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
         pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : lvl === 1 ? HUT_H[v.hut] : HEIGHT[lvl - 1]) * HOUSE + 0.6, z),
         kind: !biz && lvl === 1 ? HUT_KINDS[v.hut] : null,
+        face: biz ? 0 : v.turn, // the door looks along (sin face, 0, cos face)
       });
     });
 
