@@ -149,16 +149,31 @@ def main():
         # never renumber everyone from scratch: residents' numbers must stay stable
         sys.exit(f"{out.name} повреждён — восстанови его (например, из данных сайта), номера жителей не трогаю")
     residents = dict(old)
+    by_cid = {r["cid"]: r for r in residents.values() if r.get("cid")}
+    next_no = max([r["no"] for r in residents.values()] + [1]) + 1  # №1 — сам остров; numbers never reused
     for c in sorted(comments, key=lambda c: c["time"]):
         nick = c["username"]
-        if not nick or nick == own or nick in residents:
+        if not nick or nick == own:
             continue
-        residents[nick] = {"no": len(residents) + 2, "nick": nick, "since": c["time"], "reel": c["reel"]}  # №1 — сам остров
+        if nick in residents:
+            residents[nick].setdefault("cid", c.get("id"))  # remember the first comment id to recognise renames
+            continue
+        moved = by_cid.get(c.get("id"))
+        if moved and moved["nick"] not in {x["username"] for x in comments}:
+            # the same first comment under a new nick: the person renamed their account, keep the number
+            print(f"  ник сменён: @{moved['nick']} → @{nick} (житель №{moved['no']})")
+            del residents[moved["nick"]]
+            moved["nick"] = nick
+            residents[nick] = moved
+            continue
+        residents[nick] = {"no": next_no, "nick": nick, "since": c["time"], "reel": c["reel"], "cid": c.get("id")}
+        next_no += 1
     rows = sorted(residents.values(), key=lambda r: r["no"])
     write_atomic(out, json.dumps(rows, ensure_ascii=False, indent=1))
     write_atomic(HERE / "comments.json", json.dumps(comments, ensure_ascii=False, indent=1))
 
     new = len(rows) - len(old)
+    write_atomic(HERE / "stats.json", json.dumps({"followers": me.get("followers_count"), "residents": len(rows) + 1}))
     print(f"\n✅ Жителей: {len(rows) + 1} (новых сегодня: {new}) → residents.json")
     print(f"   Комментов всего: {len(comments)} → comments.json")
     print(f"   Собрано {datetime.now(timezone.utc).astimezone():%d.%m %H:%M}")
