@@ -132,7 +132,8 @@
       .progress { margin-top: 5px; font-size: 10px; }
       .bar { height: 5px; }
       .empty-info { margin-top: 4px; font-size: 10.5px; }
-      .banner { padding: 5px 5px 5px 6px; gap: 6px; font-size: 11.5px; }
+      /* the poll banner sits at the bottom, right above the tools */
+      .banner { position: fixed; left: 8px; right: 8px; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 4; padding: 5px 5px 5px 6px; gap: 6px; font-size: 11.5px; }
       .banner .fold { font-size: 15px; width: 20px; }
       .banner .go { padding: 7px 11px; border-radius: 10px; font-size: 12px; }
       .banner.folded { width: 34px; padding: 4px; }
@@ -159,9 +160,8 @@
     <div class="panel stats">
       <div class="row">
         <div>Жителей: <b id="count">…</b><span class="dot">·</span>День <b id="day">…</b></div>
-        <button class="link" id="lost">Не нашёл себя?</button>
       </div>
-      <div class="progress"><div class="bar"><i id="bar"></i></div><span id="goal">…</span></div>
+      <div class="progress"><div class="bar"><i id="bar"></i></div><span id="goal">…</span><button class="link" id="lost">Не нашёл себя?</button></div>
       <div class="empty-info" id="emptyInfo"></div>
     </div>
     <div class="panel banner" id="banner">
@@ -300,7 +300,9 @@
         sun.position.set(-R * 0.9, R * 1.6, R * 0.8);
         controls.maxDistance = R * 4;
         scene.fog = new THREE.Fog("#a8e0f8", R * 3, R * 7);
-        flyTo(new THREE.Vector3(0, 2, 0), new THREE.Vector3(R * 0.9, R * 0.95 + 10, R * 1.25), 0);
+        // on a phone start closer and from above, so houses fill the screen instead of the sky
+        const tall = innerWidth < innerHeight;
+        flyTo(new THREE.Vector3(0, 2, 0), tall ? new THREE.Vector3(R * 0.35, R * 1.05 + 8, R * 0.6) : new THREE.Vector3(R * 0.9, R * 0.95 + 10, R * 1.25), 0);
         $("loading").remove();
         const fromLink = norm(new URLSearchParams(location.search).get("nick") || decodeURIComponent(location.hash.slice(1)));
         if (fromLink) find(fromLink);
