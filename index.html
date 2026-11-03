@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=4"></script>
+  <script src="island.js?v=5"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -160,7 +160,7 @@
     </div>
     <div class="panel stats">
       <div class="row">
-        <div>Жителей: <b id="count">…</b><span class="dot">·</span>День <b id="day">…</b></div>
+        <div>Жителей: <b id="count">…</b><span class="dot">·</span>Бизнесов: <b id="bizCount">0</b><span class="dot">·</span>День <b id="day">…</b></div>
       </div>
       <div class="progress"><div class="bar"><i id="bar"></i></div><span id="goal">…</span><button class="link" id="lost">Не нашёл себя?</button></div>
       <div class="empty-info" id="emptyInfo"></div>
@@ -300,6 +300,7 @@
         showIsland(residents);
         const total = residents.length + 1;
         $("count").textContent = fmt(total);
+        $("bizCount").textContent = fmt(residents.filter((r) => r.biz).length);
         if (emptyPlots) $("emptyInfo").textContent = `🚧 Пустых участков: ${fmt(emptyPlots)} — займи свой комментом`;
         $("day").textContent = dayOf(new Date().toISOString());
         const goal = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 1000000].find((g) => g > total);
@@ -455,8 +456,9 @@
         <div class="fields">
           <div><span>Район</span><span>${district(h.ring || 0)}</span></div>
           <div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>
-          <div><span>Дом</span><span>${lv.emoji} ${lv.name}</span></div>
-          <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>
+          ${h.biz ? `<div><span>Бизнес</span><span>${h.biz.emoji} ${esc(h.biz.title)} ${esc(h.biz.label)}</span></div>`
+            : `<div><span>Дом</span><span>${lv.emoji} ${lv.name}</span></div>
+          <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>`}
         </div>
         <div class="actions">
           <button class="btn yellow" id="share">↗ Поделиться</button>
@@ -524,6 +526,8 @@
         ["🌴", "Пальмовый квартал", "Первые жители острова", () => { const h = island.houses.get(residents[0] && residents[0].nick); if (h) find(h.nick); }],
         ["⚓", "Причал", "Лодка и вид на океан", () => flyTo(island.pier, island.pier.clone().add(V(-9, 7, 11)))],
       ];
+      const biz = list.filter((h) => h.biz);
+      items.push(["🏪", "Бизнесы острова", biz.length ? `${biz.length} ${plural(biz.length, "бизнес", "бизнеса", "бизнесов")} · напиши в комменте «хочу кафе» — и он твой` : "Напиши в комменте «хочу кафе» или «шаурму» — откроем твой бизнес", () => { if (biz.length) find(biz[Math.floor(Math.random() * biz.length)].nick); }]);
       if (wished.length) items.push(["🚩", "Исполненные желания", `${wished.length} ${plural(wished.length, "дом", "дома", "домов")} по просьбам из комментов`, () => find(wished[Math.floor(Math.random() * wished.length)].nick)]);
       if (top && top.level > 1) items.push([OstrovIsland.LEVELS[top.level - 1].emoji, "Лучший дом острова", "@" + top.nick + " · " + OstrovIsland.LEVELS[top.level - 1].name, () => find(top.nick)]);
       if (newest) items.push(["🏗", "Новые земли", "Здесь строятся самые свежие дома", () => find(newest.nick)]);
