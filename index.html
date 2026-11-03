@@ -345,7 +345,8 @@
       if (!island) return;
       const maxTags = window.innerWidth < 600 ? 22 : 45;
       const list = [];
-      island.houses.forEach((h) => { if (h.nick !== selected) list.push([h.top.distanceToSquared(camera.position), h]); });
+      // a business already shows the nick on its sign board, so it gets no floating tag unless selected
+      island.houses.forEach((h) => { if (h.nick !== selected && !h.biz) list.push([h.top.distanceToSquared(camera.position), h]); });
       list.sort((a, b) => a[0] - b[0]);
       const show = list.slice(0, maxTags).map((x) => x[1]);
       if (selected && island.houses.has(selected)) show.unshift(island.houses.get(selected));
@@ -457,7 +458,7 @@
           <div><span>Район</span><span>${district(h.ring || 0)}</span></div>
           <div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>
           ${h.biz ? `<div><span>Бизнес</span><span>${h.biz.emoji} ${esc(h.biz.title)} ${esc(h.biz.label)}</span></div>`
-            : `<div><span>Дом</span><span>${lv.emoji} ${lv.name}</span></div>
+            : `<div><span>Дом</span><span>${(h.kind || lv).emoji} ${(h.kind || lv).name}</span></div>
           <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>`}
         </div>
         <div class="actions">
@@ -522,7 +523,7 @@
       const newest = list.slice().sort((a, b) => b.no - a.no)[0];
       const V = (x, y, z) => new THREE.Vector3(x, y, z);
       const items = [
-        ["🔥", "Центральная площадь", "Костёр, табличка и шалаш основателя", () => flyTo(V(0, 2.5, 0), V(7, 9, 10))],
+        ["🔥", "Центральная площадь", "Костёр, табличка и шалаш основателя", () => flyTo(V(1.2, 6.8, -1.6), V(-5, 9.5, 9))],
         ["🌴", "Пальмовый квартал", "Первые жители острова", () => { const h = island.houses.get(residents[0] && residents[0].nick); if (h) find(h.nick); }],
         ["⚓", "Причал", "Лодка и вид на океан", () => flyTo(island.pier, island.pier.clone().add(V(-9, 7, 11)))],
       ];
@@ -631,7 +632,7 @@
       roundRect(g, W / 2 - 190, 1240, 380, 72, 16, "#f4d35e");
       g.fillStyle = "#1d1a0c"; g.font = "900 40px Montserrat"; g.fillText("ЖИТЕЛЬ №" + h.no, W / 2, 1291);
       const lv = OstrovIsland.LEVELS[h.level - 1];
-      const rows = [["Район", distr], ["Заселился", day ? "день " + day : "—"], ["Дом", lv.name]];
+      const rows = [["Район", distr], ["Заселился", day ? "день " + day : "—"], ["Дом", (h.kind || lv).name]];
       g.font = "700 40px Montserrat";
       rows.forEach(([k, val], i) => {
         const y = 1420 + i * 78;
