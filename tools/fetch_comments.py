@@ -137,7 +137,8 @@ def main():
             # replies inside a thread («я тоже») count as comments too
             for x in [c] + c.get("replies", {}).get("data", []):
                 comments.append({"id": x.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (x.get("username") or "").lower(),
-                                 "text": x.get("text", ""), "time": x["timestamp"], "reply": x is not c})
+                                 "text": x.get("text", ""), "time": x["timestamp"], "reply": x is not c,
+                                 "parent": c.get("id") if x is not c else None})
                 got += 1
         print(f"  рилс {n}: {m['permalink']}  комментов {got} (по счётчику {m.get('comments_count', '?')})")
 
