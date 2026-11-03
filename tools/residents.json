@@ -570,7 +570,8 @@
   "no": 83,
   "nick": "bgirls_shakira",
   "since": "2026-11-02T15:24:47+0000",
-  "reel": "https://www.instagram.com/reel/DfOtHsyuwOx/"
+  "reel": "https://www.instagram.com/reel/DfOtHsyuwOx/",
+  "cid": "18349465735262073"
  },
  {
   "no": 84,
@@ -1481,5 +1482,12 @@
   "since": "2026-11-03T16:12:52+0000",
   "reel": "https://www.instagram.com/reel/DfRRuA5MQ7O/",
   "cid": "17938997136147651"
+ },
+ {
+  "no": 214,
+  "nick": "ina_9_6",
+  "since": "2026-11-03T17:15:08+0000",
+  "reel": "https://www.instagram.com/reel/DfOtHsyuwOx/",
+  "cid": "17994255693053641"
  }
 ]
