@@ -30,7 +30,7 @@
   const FEATURES = {
     flag: "🚩 флаг", fire: "🔥 костёр", barrel: "🛢 бочка", chest: "🧰 сундук", surf: "🏄 доска для серфинга",
     hammock: "🏝 гамак", laundry: "👕 сушилка", torch: "🕯 факел", pot: "🌺 цветок", boat: "🛶 лодка",
-    pet: "🐶 питомец", ball: "⚽ мяч", lamp: "🏮 фонарь", palm: "🌴 пальма",
+    pet: "🐶 питомец", ball: "⚽ мяч", lamp: "🏮 фонарь", palm: "🌴 пальма", horse: "🐴 лошадка",
   };
   const COLORS = {
     red: "#E2483D", blue: "#2E86AB", green: "#3FA34D", yellow: "#F4D35E", pink: "#FF7AA8",
@@ -218,6 +218,19 @@
     ball: (b, x, y, z) => { b.box(x, y + 0.2, z, 0.4, 0.4, 0.4, "#FFFFFF").box(x, y + 0.2, z + 0.21, 0.14, 0.14, 0.02, "#222222"); },
     lamp: (b, x, y, z) => { b.box(x, y + 1.0, z, 0.12, 2.0, 0.12, "#444444").box(x, y + 2.1, z, 0.4, 0.45, 0.4, C.lamp).box(x, y + 2.4, z, 0.5, 0.1, 0.5, "#333333"); },
     palm: (b, x, y, z) => palm(b, x, y, z, 4, 1),
+    // a brown horse facing +z (towards the street), centred on its spot: long along z so it stays clear of the house
+    horse: (b, x, y, z) => {
+      const s = 0.9, hx = (dx) => x + dx * s, hy = (dy) => y + dy * s, hz = (dz) => z + (dz - 0.2) * s;
+      const coat = "#A0522D", leg = "#7A3E1D", hair = "#3B2414";
+      b.box(hx(0), hy(0.95), hz(0), 0.5 * s, 0.55 * s, 1.3 * s, coat);
+      [[-0.17, -0.45], [-0.17, 0.45], [0.17, -0.45], [0.17, 0.45]].forEach(([a, c]) => b.box(hx(a), hy(0.35), hz(c), 0.16 * s, 0.7 * s, 0.16 * s, leg));
+      b.box(hx(0), hy(1.35), hz(0.62), 0.36 * s, 0.7 * s, 0.32 * s, coat, coat, 0, 0, 0.5);
+      b.box(hx(0), hy(1.5), hz(0.55), 0.12 * s, 0.75 * s, 0.18 * s, hair, hair, 0, 0, 0.5);
+      b.box(hx(0), hy(1.65), hz(0.92), 0.32 * s, 0.3 * s, 0.55 * s, coat);
+      b.box(hx(0), hy(1.6), hz(1.15), 0.28 * s, 0.22 * s, 0.15 * s, "#5A2E14");
+      b.box(hx(-0.1), hy(1.86), hz(0.8), 0.08 * s, 0.14 * s, 0.08 * s, leg).box(hx(0.1), hy(1.86), hz(0.8), 0.08 * s, 0.14 * s, 0.08 * s, leg);
+      b.box(hx(0), hy(0.85), hz(-0.72), 0.14 * s, 0.6 * s, 0.12 * s, hair, hair, 0, 0, -0.35);
+    },
   };
 
   // ── bigger levels, roof colour comes from the look
