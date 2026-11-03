@@ -132,10 +132,13 @@ def main():
     comments = []
     for n, m in enumerate(media, 1):
         got = 0
-        for c in pages(f"{m['id']}/comments", token, fields="id,text,username,timestamp", limit=50):
-            comments.append({"id": c.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (c.get("username") or "").lower(),
-                             "text": c.get("text", ""), "time": c["timestamp"]})
-            got += 1
+        fields = "id,text,username,timestamp,replies{id,text,username,timestamp}"
+        for c in pages(f"{m['id']}/comments", token, fields=fields, limit=50):
+            # replies inside a thread («я тоже») count as comments too
+            for x in [c] + c.get("replies", {}).get("data", []):
+                comments.append({"id": x.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (x.get("username") or "").lower(),
+                                 "text": x.get("text", ""), "time": x["timestamp"], "reply": x is not c})
+                got += 1
         print(f"  рилс {n}: {m['permalink']}  комментов {got} (по счётчику {m.get('comments_count', '?')})")
 
     # residents: unique commenters by first comment, the account itself excluded; existing numbers are kept
