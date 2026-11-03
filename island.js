@@ -379,9 +379,10 @@
     g.fillStyle = "#8A5C31";
     for (let i = 0; i < 4; i++) g.fillRect(0, i * 96 + 92, 512, 6);
     g.fillStyle = "#FFFFFF"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.font = "900 74px Montserrat, sans-serif"; g.fillText("ОСТРОВ", 256, 96); g.fillText("ПОДПИСЧИКОВ", 256, 176);
+    // maxWidth keeps the long word inside the board on any font
+    g.font = "900 74px Montserrat, sans-serif"; g.fillText("ОСТРОВ", 256, 96, 460); g.font = "900 62px Montserrat, sans-serif"; g.fillText("ПОДПИСЧИКОВ", 256, 176, 460);
     g.fillStyle = "#0B3954"; g.fillRect(40, 262, 432, 92);
-    g.fillStyle = "#FFFFFF"; g.font = "800 48px Montserrat, sans-serif"; g.fillText("ЖИТЕЛЕЙ: " + residentsCount, 256, 310);
+    g.fillStyle = "#FFFFFF"; g.font = "800 48px Montserrat, sans-serif"; g.fillText("ЖИТЕЛЕЙ: " + residentsCount, 256, 310, 410);
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
     return tex;
