@@ -30,7 +30,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 WISHES = [
     ("flag", ["флаг", "flag"]), ("fire", ["костер", "костр", "огонь", "огня"]), ("boat", ["лодк", "корабл", "яхт"]),
     ("pet", ["собак", "пес", "щен", "кот", "кош", "питом"]), ("palm", ["пальм"]), ("lamp", ["маяк", "фонар"]),
-    ("ball", ["футбол", "мяч", "роналду", "месси", "ronaldo", "messi"]),
+    ("ball", ["футбол", "мяч", "роналду", "месси", "ronaldo", "messi"]), ("horse", ["лошад", "лошак", "конь", "коня", "коник", "жеребен"]),
     ("red", ["красн"]), ("blue", ["синий", "синем", "синего", "голуб"]), ("green", ["зелен"]), ("yellow", ["желт"]),
     ("pink", ["розов"]), ("black", ["черн"]), ("purple", ["фиолет"]), ("white", ["белый", "белом", "белого"]),
     ("orange", ["оранж"]),
@@ -156,6 +156,14 @@ def main():
             residents[nick]["biz"] = w["biz"]
             if w.get("brand"):
                 residents[nick]["brand"] = w["brand"]
+
+    # yard items given by hand (a request that came through Telegram or DM): gifts.json {"nick": ["horse", ...]}
+    gifts_file = HERE / "gifts.json"
+    gifts = json.loads(gifts_file.read_text(encoding="utf-8")) if gifts_file.exists() else {}
+    for nick, tags in gifts.items():
+        if nick in residents:
+            wish = residents[nick].setdefault("wish", [])
+            wish += [t for t in tags if t not in wish]
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
