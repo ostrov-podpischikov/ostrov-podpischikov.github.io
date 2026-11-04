@@ -97,7 +97,8 @@ def quest_levels(nicks):
     friends, reels = {}, {}
     for c in json.loads(f.read_text(encoding="utf-8")):
         who = c.get("username")
-        if not who:
+        # only residents count — the island's own auto-replies («@nick, твой дом готов») must not look like a friend
+        if not who or who not in nicks:
             continue
         reels.setdefault(who, set()).add(c.get("reel"))
         for tagged in re.findall(r"@([a-z0-9._]+)", c.get("text", "").lower()):
