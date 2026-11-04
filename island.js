@@ -579,7 +579,8 @@
       const [i, j] = s.slice(1).split(",").map(Number);
       const col = hash(i * 5 + (s[0] === "v" ? 1 : 7), j) < 0.5 ? C.path : C.path2;
       if (s[0] === "v") { const x = i * PLOT - H, z = j * PLOT; if (topAt(x, z) === 2) b.box(x, 2.03, z, STREET, 0.06, PLOT, col); }
-      else { const x = i * PLOT, z = j * PLOT - H; if (topAt(x, z) === 2) b.box(x, 2.03, z, PLOT, 0.06, STREET, col); }
+      // a hair above the other direction, so the two never share a plane where streets cross (that flickered)
+      else { const x = i * PLOT, z = j * PLOT - H; if (topAt(x, z) === 2) b.box(x, 2.04, z, PLOT, 0.06, STREET, col); }
     });
     corners.forEach((s) => {
       const [i, j] = s.split(",").map(Number);
@@ -666,7 +667,7 @@
     });
 
     // plaza: big campfire, log benches, the founder's hut and the sign
-    b.box(0, 2.03, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
+    b.box(0, 2.06, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
     for (let a = 0; a < 10; a++) {
       const ang = (a / 10) * Math.PI * 2;
       b.box(Math.cos(ang) * 1.1, 2.15, Math.sin(ang) * 1.1, 0.4, 0.3, 0.4, a % 2 ? C.stone : C.stone2);
