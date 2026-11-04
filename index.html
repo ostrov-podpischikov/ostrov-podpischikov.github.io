@@ -261,12 +261,14 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#8fd6f6");
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 3000);
+    // near plane at 1 (not 0.1): far better depth precision, so flat ground pieces stop flickering through each other
+    const camera = new THREE.PerspectiveCamera(45, 1, 1, 3000);
     scene.add(new THREE.HemisphereLight("#d8f3ff", "#5a8f3c", 0.5));
     const sun = new THREE.DirectionalLight("#fff1d6", 0.72);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.04; // no shadow stripes crawling over the ground while the camera moves
     scene.add(sun, sun.target);
     const ocean = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: "#1E9CC8" }));
     ocean.rotation.x = -Math.PI / 2;
