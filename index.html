@@ -255,8 +255,8 @@
     // ── renderer and scene
     const canvas = $("scene");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    // phones: 1.5× is sharp enough and keeps the frame rate smooth (2–3× made the map stutter on iPhone)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, innerWidth < 768 ? 1.5 : 2));
+    // whole-number ratio only: a fractional one (1.5×) is resampled by iOS and shimmers
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
@@ -267,7 +267,7 @@
     const sun = new THREE.DirectionalLight("#fff1d6", 0.72);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.bias = -0.0006;
+    sun.shadow.bias = -0.0015;
     sun.shadow.normalBias = 0.04; // no shadow stripes crawling over the ground while the camera moves
     scene.add(sun, sun.target);
     const ocean = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: "#1E9CC8" }));
