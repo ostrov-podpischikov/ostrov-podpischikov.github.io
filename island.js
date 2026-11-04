@@ -76,27 +76,11 @@
     return PLOTS[idx];
   }
 
-  // pixel look: every face is tinted by a small grey noise texture, one texel ≈ 0.25 units, shared by all meshes
-  const PIXEL_TILE = 4; // world units per texture repeat (16 texels)
-  let VOXEL_MAT = null;
-  function voxelMaterial(T) {
-    if (VOXEL_MAT) return VOXEL_MAT;
-    const c = document.createElement("canvas");
-    c.width = c.height = 16;
-    const g = c.getContext("2d");
-    for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
-      const v = Math.round(255 * (0.93 + 0.07 * hash(i * 1.7 + 3, j * 2.3 + 11)));
-      g.fillStyle = `rgb(${v},${v},${v})`;
-      g.fillRect(i, j, 1, 1);
-    }
-    const tex = new T.CanvasTexture(c);
-    // crisp pixels up close, smoothed far away (without mipmaps the distant noise shimmers into mush)
-    tex.magFilter = T.NearestFilter;
-    tex.minFilter = T.LinearMipmapLinearFilter;
-    tex.wrapS = tex.wrapT = T.RepeatWrapping;
-    VOXEL_MAT = new T.MeshLambertMaterial({ vertexColors: true, map: tex });
-    return VOXEL_MAT;
-  }
+  // world-space UVs are kept on every box (one repeat per PIXEL_TILE units) for a future texture; a pixel-noise
+  // texture shimmered on phones, so the island renders with plain vertex colours and one shared material
+  const PIXEL_TILE = 4;
+  let FLAT_MAT = null;
+  const flatMaterial = (T) => FLAT_MAT || (FLAT_MAT = new T.MeshLambertMaterial({ vertexColors: true }));
 
   function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.uv = []; this.xf = null; }
   // boxes added after around(x, y, z, s, turn) are scaled by s and turned by turn about that point; around() with no args resets
@@ -134,7 +118,7 @@
     g.setAttribute("normal", new T.Float32BufferAttribute(this.nor, 3));
     g.setAttribute("color", new T.Float32BufferAttribute(this.col, 3));
     g.setAttribute("uv", new T.Float32BufferAttribute(this.uv, 2));
-    const mesh = new T.Mesh(g, voxelMaterial(T));
+    const mesh = new T.Mesh(g, flatMaterial(T));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
@@ -495,14 +479,15 @@
   }
 
   // the empty-plot board, styled like the city's «free flats» sign: white, yellow edge, two dark lines
-  function emptySignTexture(THREE) {
+  function emptySignTexture(THREE, no) {
     const c = document.createElement("canvas");
-    c.width = 512; c.height = 158;
+    c.width = 384; c.height = 118;
     const g = c.getContext("2d");
-    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 512, 158);
-    g.fillStyle = "#1B2129"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.font = "900 46px Montserrat, sans-serif"; g.fillText("СВОБОДНЫЙ УЧАСТОК", 256, 52, 480);
-    g.font = "800 36px Montserrat, sans-serif"; g.fillText("ПИШИ В КОММЕНТАРИЯХ", 256, 110, 480);
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 384, 118);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = "#1B2129"; g.font = "900 34px Montserrat, sans-serif"; g.fillText("УЧАСТОК №" + no, 192, 30, 360);
+    g.fillStyle = "#C8473D"; g.font = "800 23px Montserrat, sans-serif"; g.fillText("ПОДПИШИСЬ + КОММЕНТ", 192, 66, 360);
+    g.fillStyle = "#1B2129"; g.font = "800 23px Montserrat, sans-serif"; g.fillText("= ТВОЙ ДОМ ЗДЕСЬ", 192, 96, 360);
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
     return tex;
@@ -669,12 +654,16 @@
       b.box(x - 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2).box(x + 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2);
       b.box(x, y + 2.0, z + 0.62, 3.7, 1.25, 0.1, "#F4C430");
     });
-    if (emptyCells.length) {
-      const plate = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.5, 1.08), new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE) }), emptyCells.length);
-      const m = new THREE.Matrix4();
-      emptyCells.forEach(([i, j], k) => plate.setMatrixAt(k, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.68)));
-      group.add(plate);
-    }
+    // each board names its plot (the number the next commenter gets) and says what to do, on both faces
+    const plateGeo = new THREE.PlaneGeometry(3.5, 1.08);
+    emptyCells.forEach(([i, j], k) => {
+      const mat = new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE, lastNo + 1 + k) });
+      const front = new THREE.Mesh(plateGeo, mat), back = new THREE.Mesh(plateGeo, mat);
+      front.position.set(i * PLOT, 4.0, j * PLOT + 0.68);
+      back.position.set(i * PLOT, 4.0, j * PLOT + 0.56);
+      back.rotation.y = Math.PI;
+      group.add(front, back);
+    });
 
     // plaza: big campfire, log benches, the founder's hut and the sign
     b.box(0, 2.03, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
