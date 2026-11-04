@@ -516,6 +516,7 @@
           <div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>
           ${h.biz ? `<div><span>Бизнес</span><span>${h.biz.emoji} ${esc(h.biz.title)} ${esc(h.biz.label)}</span></div>`
             : `<div><span>Дом</span><span>${(h.kind || lv).emoji} ${(h.kind || lv).name}</span></div>
+          ${h.follows === false ? `<div><span>⚠️ Подписка</span><span>подпишись, чтобы сохранить дом</span></div>` : ""}
           <div><span>Уровень</span><span>${h.level} из 7 · ${lv.emoji} ${lv.name}${h.level < 7 ? " → " + OstrovIsland.LEVELS[h.level].name : ""}</span></div>
           <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>`}
         </div>
