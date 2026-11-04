@@ -98,6 +98,8 @@ def main():
     st = load(HERE / "dm.json", {})
     st.setdefault("invited", [])   # comment ids we sent a private reply to
     st.setdefault("answered", {})  # IGSID → time of the last message we answered
+    # only messages that arrive after the first run get the automatic reply — old conversations are left alone
+    st.setdefault("since", now.strftime("%Y-%m-%dT%H:%M:%S+0000"))
     follows = load(HERE / "follows.json", {})  # nick → true / false
     residents = {r["nick"]: r for r in load(HERE / "residents.json", [])}
 
@@ -141,8 +143,8 @@ def main():
             prof, err = call(igsid, {"fields": "username,is_user_follow_business", "access_token": ptok})
             if prof and "is_user_follow_business" in prof:
                 follows[nick] = bool(prof["is_user_follow_business"])
-            if st["answered"].get(igsid, "") >= last.get("created_time", ""):
-                continue  # already answered their latest message
+            if st["answered"].get(igsid, "") >= last.get("created_time", "") or last.get("created_time", "") < st["since"]:
+                continue  # already answered, or written before the replies were switched on
             r = residents[nick]
             text = LINK.format(no=r["no"], url=SITE + nick)
             if follows.get(nick) is False:
