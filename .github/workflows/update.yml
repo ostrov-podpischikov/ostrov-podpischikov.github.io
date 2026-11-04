@@ -29,9 +29,11 @@ jobs:
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_USER_ID: ${{ vars.IG_USER_ID || '17841417700837854' }}
+          DM_INVITE: ${{ vars.DM_INVITE }}
           OSTROV_SITE_DATA: data
         run: |
           python tools/fetch_comments.py
+          python tools/dm_follow.py || echo "Личные сообщения пропущены"
           python tools/build_map.py
 
       - name: Автоответы на комментарии (включаются переменной AUTO_REPLY=on)
@@ -45,8 +47,8 @@ jobs:
         run: |
           git config user.name "ostrov-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          touch tools/replied.json
-          git add tools/residents.json tools/replied.json data/residents.json data/polls.json
+          touch tools/replied.json tools/dm.json tools/follows.json
+          git add tools/residents.json tools/replied.json tools/dm.json tools/follows.json data/residents.json data/polls.json
           if git diff --cached --quiet; then
             echo "Без изменений"
           else
