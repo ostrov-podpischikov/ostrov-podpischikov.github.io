@@ -101,6 +101,8 @@
     .dtop h2 { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
     .tour { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: rgba(255, 255, 255, 0.06); color: var(--text); padding: 12px; border-radius: 14px; margin-bottom: 8px; cursor: pointer; text-align: left; font-family: inherit; }
     .tour:hover { background: rgba(255, 255, 255, 0.1); }
+    .tour.next { outline: 2px solid var(--accent); }
+    #goal { cursor: pointer; text-decoration: underline dotted; }
     .tour .em { font-size: 26px; width: 34px; text-align: center; }
     .tour b { display: block; font-size: 15px; font-weight: 800; }
     .tour small { color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -180,6 +182,25 @@
   <div class="panel drawer" id="tours">
     <div class="dtop"><h2>ЭКСКУРСИИ</h2><button class="x" data-shut="tours">×</button></div>
     <div id="tourList"></div>
+  </div>
+
+  <div class="panel drawer" id="quests">
+    <div class="dtop"><h2>ПРОКАЧАЙ ДОМ</h2><button class="x" data-shut="quests">×</button></div>
+    <div class="gsub">Шалаш → Хижина → Домик → Коттедж → Особняк → Вилла → Маяк. Каждое задание — +1 уровень.</div>
+    <div class="tour"><span class="em">💬</span><span><b>Оставь коммент под рилсом</b><small>получишь дом с ником над крышей</small></span></div>
+    <div class="tour"><span class="em">🎁</span><span><b>Попроси вещь в комменте</b><small>флаг, лодка, лошадка, костёр, цвет крыши — появится во дворе</small></span></div>
+    <div class="tour"><span class="em">📸</span><span><b>Отметь @ostrov.podpischikov в сторис</b><small>+1 уровень после проверки</small></span></div>
+    <div class="tour"><span class="em">👥</span><span><b>Позови друга</b><small>пусть отметит тебя @ником в комменте — +1 уровень за друга, до 2</small></span></div>
+    <div class="tour"><span class="em">🔁</span><span><b>Комментируй новые рилсы</b><small>каждый следующий рилс — +1 уровень, до 2</small></span></div>
+    <div class="tour"><span class="em">✈️</span><span><b>Привяжи ник в Telegram-боте</b><small>ракушки и прокачка — скоро и на карте</small></span></div>
+    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 К рилсам</a>
+    <a class="btn dark full" href="https://t.me/ostrov_podpischikov_bot" target="_blank" rel="noopener">✈️ Telegram-бот</a>
+  </div>
+
+  <div class="panel drawer" id="goals">
+    <div class="dtop"><h2>ЦЕЛИ ОСТРОВА</h2><button class="x" data-shut="goals">×</button></div>
+    <div id="goalList"></div>
+    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 Позови друга — пусть напишет коммент</a>
   </div>
 
   <div class="panel drawer" id="polls">
@@ -279,6 +300,18 @@
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const fmt = (n) => n.toLocaleString("ru-RU");
     const dayOf = (iso) => (iso ? Math.max(1, Math.floor((Date.parse(iso) - DAY1) / 86400000) + 1) : null);
+    // milestones: what the island gets when it reaches each count (shown under the progress bar and in «Цели острова»)
+    const GOALS = [
+      { n: 250, emoji: "🎡", title: "колесо обозрения", what: "на центральной площади" },
+      { n: 500, emoji: "🏖", title: "пляж с лежаками", what: "зонтики, лежаки и бар у воды" },
+      { n: 1000, emoji: "🌉", title: "второй остров", what: "и мост к нему — новые участки" },
+      { n: 2500, emoji: "🛥", title: "яхт-клуб", what: "пирс с яхтами вокруг острова" },
+      { n: 5000, emoji: "🌋", title: "вулкан", what: "на самом большом мысе" },
+      { n: 10000, emoji: "✈️", title: "аэропорт", what: "свой самолёт над островом" },
+      { n: 50000, emoji: "🏙", title: "архипелаг", what: "острова-районы для жителей" },
+      { n: 100000, emoji: "🚀", title: "космодром", what: "запуск ракеты с острова" },
+      { n: 1000000, emoji: "👑", title: "остров-миллионник", what: "праздник для всех жителей" },
+    ];
     const DISTRICTS = [[1.6, "Центральная площадь"], [3.2, "Пальмовый квартал"], [5.2, "Ракушечная бухта"], [8.2, "Маячный район"], [13, "Песчаные дюны"], [Infinity, "Новые земли"]];
     const district = (ring) => DISTRICTS.find((d) => ring <= d[0])[1];
 
@@ -304,8 +337,13 @@
         $("bizCount").textContent = fmt(residents.filter((r) => r.biz).length);
         if (emptyPlots) $("emptyInfo").textContent = `🚧 Пустых участков: ${fmt(emptyPlots)} — займи свой комментом`;
         $("day").textContent = dayOf(new Date().toISOString());
-        const goal = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 1000000].find((g) => g > total);
-        $("goal").textContent = "До " + fmt(goal) + ": ещё " + fmt(goal - total);
+        const g = GOALS.find((x) => x.n > total) || GOALS[GOALS.length - 1], goal = g.n;
+        $("goal").textContent = `До ${fmt(goal)}: ещё ${fmt(Math.max(0, goal - total))} · ${g.emoji} ${g.title}`;
+        $("goalList").innerHTML = GOALS.map((x) => {
+          const done = total >= x.n, next = x === g;
+          const state = done ? "✅ открыто" : next ? `ещё ${fmt(x.n - total)}` : "🔒";
+          return `<div class="tour${next ? " next" : ""}"><span class="em">${x.emoji}</span><span><b>${fmt(x.n)} жителей — ${esc(x.title)}</b><small>${esc(x.what)} · ${state}</small></span></div>`;
+        }).join("");
         requestAnimationFrame(() => ($("bar").style.width = Math.min(100, (total / goal) * 100).toFixed(1) + "%"));
         const R = island.radius;
         Object.assign(sun.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 1, far: R * 4 });
@@ -465,13 +503,15 @@
           <div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>
           ${h.biz ? `<div><span>Бизнес</span><span>${h.biz.emoji} ${esc(h.biz.title)} ${esc(h.biz.label)}</span></div>`
             : `<div><span>Дом</span><span>${(h.kind || lv).emoji} ${(h.kind || lv).name}</span></div>
+          <div><span>Уровень</span><span>${h.level} из 7 · ${lv.emoji} ${lv.name}${h.level < 7 ? " → " + OstrovIsland.LEVELS[h.level].name : ""}</span></div>
           <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>`}
         </div>
         <div class="actions">
           <button class="btn yellow" id="share">↗ Поделиться</button>
           <button class="btn dark" id="pass">🪪 Паспорт жителя</button>
         </div>
-        <a class="btn dark full" href="${BOT}" target="_blank" rel="noopener">⬆️ Прокачать дом в Telegram</a>`;
+        <button class="btn dark full" id="lvlUp">⬆️ Прокачай дом — задания</button>`;
+      $("lvlUp").onclick = () => openDrawer("quests");
       $("share").onclick = () => shareLink(h);
       $("pass").onclick = () => openPassport(h, district(h.ring || 0), day);
     }
@@ -493,7 +533,7 @@
 
     // ── drawers: tours and growth (one open at a time, the resident sheet closes)
     function openDrawer(id) {
-      ["tours", "growth", "polls"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
+      ["tours", "growth", "polls", "goals", "quests"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
       sheet.style.display = "none";
     }
 
@@ -552,6 +592,7 @@
     }
     const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
     $("tTours").onclick = () => { tours(); openDrawer("tours"); };
+    $("goal").onclick = () => openDrawer("goals");
 
     // ── before / after: rebuild the island as it was on day N
     // the last day is today, or later if a resident's date is ahead of this viewer's clock
@@ -595,7 +636,7 @@
     // ── random neighbour
     $("tRandom").onclick = () => {
       if (!residents.length) return;
-      ["tours", "growth", "polls"].forEach((d) => ($(d).style.display = "none"));
+      ["tours", "growth", "polls", "goals", "quests"].forEach((d) => ($(d).style.display = "none"));
       stopGrowth(false);
       if (island.houses.size !== residents.length) showIsland(residents);
       find(residents[Math.floor(Math.random() * residents.length)].nick);
