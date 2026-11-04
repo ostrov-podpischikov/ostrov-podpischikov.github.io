@@ -111,24 +111,32 @@ def main():
     # 1) invitations: one private reply to each resident's first comment
     if os.environ.get("DM_INVITE", "").lower() == "on" or args.dry_run:
         oldest = iso(now - timedelta(days=INVITE_MAX_AGE_DAYS))
-        comments = {c["id"]: c for c in load(HERE / "comments.json", []) if c.get("id")}
         # DM_ONLY="nick1,nick2" limits invitations to test accounts until Meta approves the permission
         only = {n.strip().lower().lstrip("@") for n in os.environ.get("DM_ONLY", "").split(",") if n.strip()}
-        todo = [r for r in residents.values() if r.get("cid") in comments and r["cid"] not in st["invited"]
-                and comments[r["cid"]]["time"][:19] >= oldest and (not only or r["nick"] in only)]
-        for r in todo[:MAX_INVITES_PER_RUN]:
+        # one invitation per person, on their newest top-level comment (Meta allows one private reply per comment)
+        invited_nicks = set(st.setdefault("invited_nicks", []))
+        newest = {}
+        for c in load(HERE / "comments.json", []):
+            nick = c.get("username", "")
+            if c.get("id") and not c.get("reply") and nick in residents and c["time"][:19] >= oldest:
+                if nick not in newest or c["time"] > newest[nick]["time"]:
+                    newest[nick] = c
+        todo = [(residents[n], c) for n, c in newest.items() if n not in invited_nicks and c["id"] not in st["invited"]
+                and (not only or n in only)]
+        for r, c in todo[:MAX_INVITES_PER_RUN]:
             text = INVITE.format(no=r["no"], url=SITE + r["nick"])
             if args.dry_run:
                 print(f"  приглашение @{r['nick']}: {text}")
                 continue
-            _, err = call(f"{page}/messages", post={"recipient": json.dumps({"comment_id": r["cid"]}), "message": json.dumps({"text": text}),
+            _, err = call(f"{page}/messages", post={"recipient": json.dumps({"comment_id": c["id"]}), "message": json.dumps({"text": text}),
                                                     "access_token": ptok})
             if err:
                 print(f"  ✗ приглашение @{r['nick']}: {err}")
                 if " 10 " in f" {err} " or "permission" in err.lower():
                     break  # no instagram_manage_messages yet — stop trying this run
                 continue
-            st["invited"].append(r["cid"])
+            st["invited"].append(c["id"])
+            st["invited_nicks"].append(r["nick"])
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
     convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(5){from,created_time}",
