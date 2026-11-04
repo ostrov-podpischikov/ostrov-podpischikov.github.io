@@ -485,9 +485,10 @@
     const g = c.getContext("2d");
     g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 384, 118);
     g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillStyle = "#1B2129"; g.font = "900 34px Montserrat, sans-serif"; g.fillText("УЧАСТОК №" + no, 192, 30, 360);
-    g.fillStyle = "#C8473D"; g.font = "800 23px Montserrat, sans-serif"; g.fillText("ПОДПИШИСЬ + КОММЕНТ", 192, 66, 360);
-    g.fillStyle = "#1B2129"; g.font = "800 23px Montserrat, sans-serif"; g.fillText("= ТВОЙ ДОМ ЗДЕСЬ", 192, 96, 360);
+    // the plot waits for a follower who has not commented yet: their place in line, and the one step left
+    g.fillStyle = "#1B2129"; g.font = "900 30px Montserrat, sans-serif"; g.fillText("ДЛЯ ПОДПИСЧИКА №" + no, 192, 30, 360);
+    g.fillStyle = "#C8473D"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("НАПИШИ КОММЕНТ —", 192, 66, 360);
+    g.fillStyle = "#1B2129"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("И ДОМ ТВОЙ", 192, 96, 360);
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
     return tex;
