@@ -89,6 +89,29 @@ def wishes_by_nick():
     return out
 
 
+def quest_levels(nicks):
+    """nick → extra levels earned in comments: friends who tagged them (@nick, up to 2) and reels beyond the first (up to 2)."""
+    f = HERE / "comments.json"
+    if not f.exists():
+        return {}
+    friends, reels = {}, {}
+    for c in json.loads(f.read_text(encoding="utf-8")):
+        who = c.get("username")
+        if not who:
+            continue
+        reels.setdefault(who, set()).add(c.get("reel"))
+        for tagged in re.findall(r"@([a-z0-9._]+)", c.get("text", "").lower()):
+            tagged = tagged.rstrip(".")
+            if tagged in nicks and tagged != who:
+                friends.setdefault(tagged, set()).add(who)
+    out = {}
+    for nick in nicks:
+        bonus = min(2, len(friends.get(nick, ()))) + min(2, max(0, len(reels.get(nick, ())) - 1))
+        if bonus:
+            out[nick] = bonus
+    return out
+
+
 def write_atomic(path, text):
     """Write through a temp file so a full disk never leaves a truncated file behind."""
     tmp = path.with_suffix(".tmp")
@@ -157,13 +180,25 @@ def main():
             if w.get("brand"):
                 residents[nick]["brand"] = w["brand"]
 
-    # yard items given by hand (a request that came through Telegram or DM): gifts.json {"nick": ["horse", ...]}
+    # given by hand (a request from Telegram or DM, a story that tagged us):
+    # gifts.json {"nick": ["horse", ...]} or {"nick": {"items": ["horse"], "levels": 1}}
     gifts_file = HERE / "gifts.json"
     gifts = json.loads(gifts_file.read_text(encoding="utf-8")) if gifts_file.exists() else {}
-    for nick, tags in gifts.items():
-        if nick in residents:
-            wish = residents[nick].setdefault("wish", [])
-            wish += [t for t in tags if t not in wish]
+    for nick, g in gifts.items():
+        if nick not in residents:
+            continue
+        g = {"items": g} if isinstance(g, list) else g
+        wish = residents[nick].setdefault("wish", [])
+        wish += [t for t in g.get("items", []) if t not in wish]
+        if not wish:
+            del residents[nick]["wish"]
+        residents[nick]["level"] = residents[nick]["level"] + int(g.get("levels", 0))
+
+    # quests from comments: a friend who tags you (+1 each, up to 2) and every extra reel you comment on (+1 each, up to 2)
+    for nick, bonus in quest_levels(set(residents)).items():
+        residents[nick]["level"] += bonus
+    for r in residents.values():
+        r["level"] = max(1, min(7, r["level"]))
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
