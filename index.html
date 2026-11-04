@@ -103,6 +103,7 @@
     .tour:hover { background: rgba(255, 255, 255, 0.1); }
     .tour.next { outline: 2px solid var(--accent); }
     #goal { cursor: pointer; text-decoration: underline dotted; }
+    .pp-hint { margin: 10px 2px 0; font-size: 13px; font-weight: 700; line-height: 1.4; color: var(--muted); text-align: center; }
     .tour .em { font-size: 26px; width: 34px; text-align: center; }
     .tour b { display: block; font-size: 15px; font-weight: 800; }
     .tour small { color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -227,8 +228,9 @@
     <img id="passportImg" alt="Паспорт жителя" />
     <div class="actions">
       <button class="btn yellow" id="ppSave">💾 Сохранить</button>
-      <button class="btn dark" id="ppShare">↗ Поделиться</button>
+      <button class="btn dark" id="ppShare">📸 В сторис</button>
     </div>
+    <p class="pp-hint">«В сторис» → выбери Instagram → «История». Отметь @ostrov.podpischikov — получишь +1 уровень дома 🏠</p>
     <button class="btn dark full" id="ppClose">Закрыть</button>
   </div></div>
 
@@ -493,7 +495,11 @@
       marker.visible = true;
       marker.userData.y = h.top.y + 2.2;
       marker.position.set(h.top.x, marker.userData.y, h.top.z);
-      flyTo(h.pos.clone().add(new THREE.Vector3(0, 2.5, 0)), front(h, 15, 12, 4));
+      // frame the whole house: the camera backs off with the house height; on a phone the card covers the lower half,
+      // so the camera looks at a point under the house and the house rises into the free band above the card
+      const hh = Math.max(4, h.top.y - h.pos.y), tall = innerWidth < innerHeight;
+      const dist = (tall ? 2.6 : 1.9) * hh + 8;
+      flyTo(h.pos.clone().add(new THREE.Vector3(0, tall ? -hh * 0.55 : hh * 0.35, 0)), front(h, dist, dist * 0.7, dist * 0.25));
       const lv = OstrovIsland.LEVELS[h.level - 1];
       const r = residents.find((x) => x.nick === nick) || {};
       const day = dayOf(r.since);
@@ -508,7 +514,7 @@
         </div>
         <div class="actions">
           <button class="btn yellow" id="share">↗ Поделиться</button>
-          <button class="btn dark" id="pass">🪪 Паспорт жителя</button>
+          <button class="btn dark" id="pass">📸 Паспорт в сторис</button>
         </div>
         <button class="btn dark full" id="lvlUp">⬆️ Прокачай дом — задания</button>`;
       $("lvlUp").onclick = () => openDrawer("quests");
