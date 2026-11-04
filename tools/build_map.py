@@ -201,6 +201,13 @@ def main():
     for r in residents.values():
         r["level"] = max(1, min(7, r["level"]))
 
+    # follow status comes from direct messages (dm_follow.py): only «not following» goes to the map — a sign on the house
+    follows_file = HERE / "follows.json"
+    follows = json.loads(follows_file.read_text(encoding="utf-8")) if follows_file.exists() else {}
+    for nick, yes in follows.items():
+        if nick in residents and yes is False:
+            residents[nick]["follows"] = False
+
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
         start = (out[-1]["no"] if out else 1) + 1
