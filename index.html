@@ -255,7 +255,8 @@
     // ── renderer and scene
     const canvas = $("scene");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // phones: 1.5× is sharp enough and keeps the frame rate smooth (2–3× made the map stutter on iPhone)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, innerWidth < 768 ? 1.5 : 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
@@ -272,9 +273,9 @@
     ocean.receiveShadow = true;
     scene.add(ocean);
 
-    // map-style: one finger / left mouse drags the island, two fingers only zoom (no turning by accident), right mouse tilts
+    // map-style: one finger / left mouse drags the island, two fingers zoom and turn, right mouse tilts
     const controls = new THREE.MapControls(camera, canvas);
-    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     controls.enableDamping = true;
     controls.dampingFactor = 0.12;
     controls.screenSpacePanning = false;
