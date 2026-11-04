@@ -551,7 +551,10 @@
       tops.set(i + "," + j, top);
     }
     const topAt = (x, z) => tops.get(Math.round(x / TERRAIN) + "," + Math.round(z / TERRAIN)) || 0;
-    group.add(terrain.mesh());
+    // flat ground only receives shadows: casting onto itself gave shadow acne that made the whole island shimmer on phones
+    const ground = terrain.mesh();
+    ground.castShadow = false;
+    group.add(ground);
 
     // shallows follow the coast; shape points are (x, -z) because the mesh is laid flat with rotation.x = -π/2
     const rim = new THREE.Shape();
