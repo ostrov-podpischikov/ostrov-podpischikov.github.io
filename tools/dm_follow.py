@@ -1,8 +1,8 @@
 """
 🏝 Остров подписчиков — личные сообщения и проверка подписки.
 
-1. Приглашение: на первый коммент жителя — одно личное сообщение (private reply)
-   «Твой дом №… готов! Ответь „да“ — пришлю ссылку». Включается переменной DM_INVITE=on.
+1. Приглашение: на первый коммент жителя — одно личное сообщение (private reply) со ссылкой на дом
+   и просьбой подписаться. Включается переменной DM_INVITE=on (DM_ONLY — только тестовые ники).
 2. Ответы: кто написал в директ — получает ссылку на свой дом; заодно узнаём, подписан ли он
    (is_user_follow_business). Неподписанным — «подпишись, чтобы сохранить дом».
    Статус пишется в follows.json → build_map.py ставит на карте табличку «подпишись».
@@ -34,7 +34,7 @@ IG_ID = os.environ.get("IG_USER_ID", "17841417700837854")
 MAX_INVITES_PER_RUN = 5
 INVITE_MAX_AGE_DAYS = 6  # Meta allows a private reply within 7 days of the comment
 
-INVITE = "Привет! Твой дом №{no} на Острове подписчиков уже стоит 🏝 Ответь «да» — пришлю ссылку на него"
+INVITE = "Привет! Твой дом №{no} на Острове подписчиков уже стоит 🏝 Вот он: {url}\nПодпишись на @ostrov.podpischikov, чтобы дом остался за тобой 🙏"
 LINK = "Вот твой дом, житель №{no}: {url} 🏡"
 FOLLOW = "Чтобы дом остался за тобой — подпишись на @ostrov.podpischikov 🙏"
 
@@ -117,7 +117,7 @@ def main():
         todo = [r for r in residents.values() if r.get("cid") in comments and r["cid"] not in st["invited"]
                 and comments[r["cid"]]["time"][:19] >= oldest and (not only or r["nick"] in only)]
         for r in todo[:MAX_INVITES_PER_RUN]:
-            text = INVITE.format(no=r["no"])
+            text = INVITE.format(no=r["no"], url=SITE + r["nick"])
             if args.dry_run:
                 print(f"  приглашение @{r['nick']}: {text}")
                 continue
