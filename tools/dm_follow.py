@@ -136,16 +136,25 @@ def main():
     if err:
         print(f"Личные сообщения: переписки недоступны ({err})")
     else:
+        # the Actions log is public: count why conversations were skipped, details only for DM_ONLY test accounts
+        only = {n.strip().lower().lstrip("@") for n in os.environ.get("DM_ONLY", "").split(",") if n.strip()}
+        skipped = {}
         for conv in convs.get("data", []):
             last = ((conv.get("messages") or {}).get("data") or [{}])[0]
             sender = last.get("from") or {}
             igsid, nick = sender.get("id"), (sender.get("username") or "").lower()
-            if not igsid or igsid == IG_ID or nick not in residents:
+            reason = ("нет отправителя" if not igsid else "последнее — наше" if igsid == IG_ID
+                      else "не житель" if nick not in residents else None)
+            if nick in only:
+                print(f"  тест @{nick}: последнее сообщение {last.get('created_time')}, причина пропуска: {reason or 'нет'}")
+            if reason:
+                skipped[reason] = skipped.get(reason, 0) + 1
                 continue
             prof, err = call(igsid, {"fields": "username,is_user_follow_business", "access_token": ptok})
             if prof and "is_user_follow_business" in prof:
                 follows[nick] = bool(prof["is_user_follow_business"])
             if st["answered"].get(igsid, "") >= last.get("created_time", "") or last.get("created_time", "") < st["since"]:
+                skipped["уже отвечено или старое"] = skipped.get("уже отвечено или старое", 0) + 1
                 continue  # already answered, or written before the replies were switched on
             r = residents[nick]
             text = LINK.format(no=r["no"], url=SITE + nick)
@@ -160,6 +169,7 @@ def main():
                 print(f"  ✗ ответ @{nick}: {err}")
                 continue
             st["answered"][igsid] = last.get("created_time", iso(now))
+        print(f"  переписок: {len(convs.get('data', []))}, пропущено: {skipped or 0}")
 
     if not args.dry_run:
         st["invited"] = st["invited"][-5000:]
