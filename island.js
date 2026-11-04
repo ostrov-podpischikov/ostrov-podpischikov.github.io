@@ -85,13 +85,14 @@
     c.width = c.height = 16;
     const g = c.getContext("2d");
     for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
-      const v = Math.round(255 * (0.86 + 0.14 * hash(i * 1.7 + 3, j * 2.3 + 11)));
+      const v = Math.round(255 * (0.93 + 0.07 * hash(i * 1.7 + 3, j * 2.3 + 11)));
       g.fillStyle = `rgb(${v},${v},${v})`;
       g.fillRect(i, j, 1, 1);
     }
     const tex = new T.CanvasTexture(c);
-    tex.magFilter = tex.minFilter = T.NearestFilter;
-    tex.generateMipmaps = false;
+    // crisp pixels up close, smoothed far away (without mipmaps the distant noise shimmers into mush)
+    tex.magFilter = T.NearestFilter;
+    tex.minFilter = T.LinearMipmapLinearFilter;
     tex.wrapS = tex.wrapT = T.RepeatWrapping;
     VOXEL_MAT = new T.MeshLambertMaterial({ vertexColors: true, map: tex });
     return VOXEL_MAT;
