@@ -436,6 +436,10 @@
         if (k >= 1) flight = null;
       }
       controls.update();
+      // near plane follows the zoom: far views get a deeper near plane, so phones (coarser depth buffers) stop
+      // flickering between the ground, the plots and the streets, which lie only centimetres apart
+      const near = Math.min(12, Math.max(0.5, camera.position.distanceTo(controls.target) / 30));
+      if (Math.abs(near - camera.near) > 0.05) { camera.near = near; camera.updateProjectionMatrix(); }
       // keep the view over the island: dragging can't carry it out to the open ocean
       const lim = island ? island.radius * 1.1 : 0, t = controls.target, d = Math.hypot(t.x, t.z);
       if (lim && d > lim) { panOffset.set(t.x, 0, t.z).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
