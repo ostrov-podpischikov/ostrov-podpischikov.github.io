@@ -595,7 +595,7 @@
       const lvl = Math.min(7, Math.max(1, r.level || 1));
       const v = look(r);
       const biz = BIZ[r.biz];
-      b.box(x, y + 0.03, z, PLOT - STREET, 0.06, PLOT - STREET, biz ? C.stone : C.pad);
+      b.box(x, y + 0.05, z, PLOT - STREET, 0.1, PLOT - STREET, biz ? C.stone : C.pad);
       // a business replaces the hut; its own props stand where the yard items would be
       const draw = (bb, ox, oz) => {
         // a business always faces +z so its sign reads from the street; huts face any side
@@ -647,10 +647,11 @@
     // empty plots: corner stakes, a rope and a little sign — «your place is waiting»
     emptyCells.forEach(([i, j]) => {
       const x = i * PLOT, z = j * PLOT, y = 2, s = (PLOT - STREET) / 2 - 0.4;
-      b.box(x, y + 0.03, z, PLOT - STREET - 0.4, 0.06, PLOT - STREET - 0.4, C.sand2);
+      b.box(x, y + 0.05, z, PLOT - STREET - 0.4, 0.1, PLOT - STREET - 0.4, C.sand2);
       [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
-      b.box(x, y + 0.72, z - s, 2 * s, 0.06, 0.06, C.rope).box(x, y + 0.72, z + s, 2 * s, 0.06, 0.06, C.rope);
-      b.box(x - s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope).box(x + s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope);
+      // ropes thick enough to stay a solid line on a phone instead of shimmering
+      b.box(x, y + 0.72, z - s, 2 * s, 0.12, 0.12, C.rope).box(x, y + 0.72, z + s, 2 * s, 0.12, 0.12, C.rope);
+      b.box(x - s, y + 0.72, z, 0.12, 0.12, 2 * s, C.rope).box(x + s, y + 0.72, z, 0.12, 0.12, 2 * s, C.rope);
       // a big sign like the city's: two posts and a board, the words go on it below as one instanced plane
       b.box(x - 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2).box(x + 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2);
       b.box(x, y + 2.0, z + 0.62, 3.7, 1.25, 0.1, "#F4C430");
