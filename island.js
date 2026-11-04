@@ -76,7 +76,28 @@
     return PLOTS[idx];
   }
 
-  function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.xf = null; }
+  // pixel look: every face is tinted by a small grey noise texture, one texel ≈ 0.25 units, shared by all meshes
+  const PIXEL_TILE = 4; // world units per texture repeat (16 texels)
+  let VOXEL_MAT = null;
+  function voxelMaterial(T) {
+    if (VOXEL_MAT) return VOXEL_MAT;
+    const c = document.createElement("canvas");
+    c.width = c.height = 16;
+    const g = c.getContext("2d");
+    for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
+      const v = Math.round(255 * (0.86 + 0.14 * hash(i * 1.7 + 3, j * 2.3 + 11)));
+      g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(i, j, 1, 1);
+    }
+    const tex = new T.CanvasTexture(c);
+    tex.magFilter = tex.minFilter = T.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    VOXEL_MAT = new T.MeshLambertMaterial({ vertexColors: true, map: tex });
+    return VOXEL_MAT;
+  }
+
+  function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.uv = []; this.xf = null; }
   // boxes added after around(x, y, z, s, turn) are scaled by s and turned by turn about that point; around() with no args resets
   Builder.prototype.around = function (x, y, z, s, turn) {
     const T = this.T;
@@ -97,6 +118,11 @@
       this.nor.push(n[i], n[i + 1], n[i + 2]);
       const c = n[i + 1] > 0.5 ? ct : Math.abs(n[i]) > 0.5 ? cb : cs;
       this.col.push(c.r, c.g, c.b);
+      // world-space UVs, so the pixel texture has the same pixel size on every face of every box
+      const ax = Math.abs(n[i]), ay = Math.abs(n[i + 1]);
+      if (ay >= ax && ay >= Math.abs(n[i + 2])) this.uv.push(p[i] / PIXEL_TILE, p[i + 2] / PIXEL_TILE);
+      else if (ax >= Math.abs(n[i + 2])) this.uv.push(p[i + 2] / PIXEL_TILE, p[i + 1] / PIXEL_TILE);
+      else this.uv.push(p[i] / PIXEL_TILE, p[i + 1] / PIXEL_TILE);
     }
     g.dispose();
     return this;
@@ -106,11 +132,22 @@
     g.setAttribute("position", new T.Float32BufferAttribute(this.pos, 3));
     g.setAttribute("normal", new T.Float32BufferAttribute(this.nor, 3));
     g.setAttribute("color", new T.Float32BufferAttribute(this.col, 3));
-    const mesh = new T.Mesh(g, new T.MeshLambertMaterial({ vertexColors: true }));
+    g.setAttribute("uv", new T.Float32BufferAttribute(this.uv, 2));
+    const mesh = new T.Mesh(g, voxelMaterial(T));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
   };
+
+  // a window on both side walls (±dx from the centre): a light frame with blue glass and a cross bar
+  function sideWindows(b, x, y, z, dx, size) {
+    const s = size || 0.5;
+    [-1, 1].forEach((k) => {
+      b.box(x + k * dx, y, z, 0.06, s, s, C.cream);
+      b.box(x + k * (dx + 0.02), y, z, 0.06, s - 0.14, s - 0.14, C.glass);
+      b.box(x + k * (dx + 0.04), y, z, 0.04, s - 0.14, 0.05, C.cream).box(x + k * (dx + 0.04), y, z, 0.04, 0.05, s - 0.14, C.cream);
+    });
+  }
 
   // ── level-1 huts: four kinds, each with its own colours
   function shalash(b, x, y, z, s, c1, c2) {
@@ -131,7 +168,8 @@
     (b, x, y, z, v) => {
       b.box(x, y + 0.65, z, 2.4, 1.3, 2.4, "#C9A27A", "#B08A62");
       b.box(x, y + 1.55, z, 3.0, 0.5, 3.0, v.c1, v.c2).box(x, y + 2.0, z, 2.1, 0.45, 2.1, v.c2, v.c1).box(x, y + 2.4, z, 1.0, 0.4, 1.0, v.c1);
-      b.box(x, y + 0.5, z + 1.22, 0.55, 1.0, 0.06, C.door);
+      b.box(x, y + 0.5, z + 1.22, 0.55, 1.0, 0.06, C.door).box(x, y + 0.06, z + 1.45, 0.8, 0.12, 0.35, C.stone);
+      sideWindows(b, x, y + 0.75, z, 1.21);
     },
     // палатка: striped canvas with poles
     (b, x, y, z, v) => {
@@ -149,6 +187,7 @@
       b.box(x, y + 1.65, z - 0.15, 2.2, 1.25, 1.9, v.w, v.w2);
       gable(b, x, y + 2.27, z - 0.15, 2.2, 1.9, v.c1, 0.85);
       b.box(x, y + 1.5, z + 0.81, 0.55, 0.95, 0.06, C.door);
+      sideWindows(b, x, y + 1.7, z - 0.15, 1.11, 0.45);
       b.box(x - 0.3, y + 0.5, z + 1.45, 0.08, 1.0, 0.08, C.log).box(x + 0.3, y + 0.5, z + 1.45, 0.08, 1.0, 0.08, C.log);
       for (let k = 0; k < 3; k++) b.box(x, y + 0.2 + k * 0.3, z + 1.45, 0.6, 0.06, 0.08, C.log);
     },
@@ -160,6 +199,7 @@
       b.box(x, y + 0.08, z + 1.15, 2.6, 0.16, 0.9, C.plank, C.plank2);
       b.box(x - 1.15, y + 0.8, z + 1.5, 0.14, 1.5, 0.14, C.log2).box(x + 1.15, y + 0.8, z + 1.5, 0.14, 1.5, 0.14, C.log2);
       b.box(x - 0.5, y + 0.6, z + 0.72, 0.55, 1.0, 0.06, C.door).box(x + 0.6, y + 0.9, z + 0.72, 0.6, 0.5, 0.06, C.glass);
+      sideWindows(b, x, y + 0.9, z - 0.3, 1.31);
     },
     // мазанка: a clay block, flat roof with beam ends, a jar on top
     (b, x, y, z, v) => {
@@ -168,6 +208,8 @@
       for (let k = -1; k <= 1; k++) b.box(x + k * 0.8, y + 1.45, z + 1.3, 0.14, 0.14, 0.4, C.log2);
       b.box(x - 0.45, y + 0.55, z + 1.21, 0.6, 1.1, 0.06, C.door).box(x + 0.65, y + 1.0, z + 1.21, 0.45, 0.45, 0.06, C.dark);
       b.box(x + 0.8, y + 1.98, z - 0.6, 0.4, 0.45, 0.4, "#C0613C");
+      b.box(x - 0.45, y + 0.06, z + 1.4, 0.8, 0.12, 0.35, C.stone);
+      sideWindows(b, x, y + 0.95, z, 1.31, 0.45);
     },
     // дом-лодка: an upturned hull on the sand, plank front with a round window
     (b, x, y, z, v) => {
@@ -183,6 +225,7 @@
       [[-1.35, -1.35], [1.35, -1.35], [-1.35, 1.35], [1.35, 1.35]].forEach(([a, c]) => b.box(x + a, y + 0.9, z + c, 0.14, 1.5, 0.14, C.log));
       b.box(x, y + 1.7, z, 3.3, 0.25, 3.3, v.c1, v.c2).box(x, y + 2.0, z, 2.5, 0.3, 2.5, v.c2, v.c1).box(x, y + 2.3, z, 1.6, 0.3, 1.6, v.c1, v.c2).box(x, y + 2.55, z, 0.7, 0.25, 0.7, v.c2);
       b.box(x, y + 0.65, z + 1.01, 0.55, 1.0, 0.06, C.door);
+      sideWindows(b, x, y + 0.95, z, 1.01, 0.45);
     },
   ];
   const HUT_KINDS = [
@@ -450,6 +493,20 @@
     });
   }
 
+  // the empty-plot board, styled like the city's «free flats» sign: white, yellow edge, two dark lines
+  function emptySignTexture(THREE) {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 158;
+    const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 512, 158);
+    g.fillStyle = "#1B2129"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "900 46px Montserrat, sans-serif"; g.fillText("СВОБОДНЫЙ УЧАСТОК", 256, 52, 480);
+    g.font = "800 36px Montserrat, sans-serif"; g.fillText("ПИШИ В КОММЕНТАРИЯХ", 256, 110, 480);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
   function signTexture(THREE, residentsCount) {
     const c = document.createElement("canvas");
     c.width = 512; c.height = 384;
@@ -607,9 +664,16 @@
       [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
       b.box(x, y + 0.72, z - s, 2 * s, 0.06, 0.06, C.rope).box(x, y + 0.72, z + s, 2 * s, 0.06, 0.06, C.rope);
       b.box(x - s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope).box(x + s, y + 0.72, z, 0.06, 0.06, 2 * s, C.rope);
-      b.box(x + 0.8, y + 0.6, z + 1.2, 0.12, 1.2, 0.12, C.log2).box(x + 0.8, y + 1.25, z + 1.2, 1.0, 0.6, 0.1, "#F5F0E6");
-      b.box(x + 0.8, y + 1.3, z + 1.26, 0.14, 0.32, 0.02, C.navy).box(x + 0.8, y + 1.07, z + 1.26, 0.12, 0.08, 0.02, C.navy);
+      // a big sign like the city's: two posts and a board, the words go on it below as one instanced plane
+      b.box(x - 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2).box(x + 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2);
+      b.box(x, y + 2.0, z + 0.62, 3.7, 1.25, 0.1, "#F4C430");
     });
+    if (emptyCells.length) {
+      const plate = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.5, 1.08), new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE) }), emptyCells.length);
+      const m = new THREE.Matrix4();
+      emptyCells.forEach(([i, j], k) => plate.setMatrixAt(k, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.68)));
+      group.add(plate);
+    }
 
     // plaza: big campfire, log benches, the founder's hut and the sign
     b.box(0, 2.03, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
