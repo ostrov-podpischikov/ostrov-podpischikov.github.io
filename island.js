@@ -494,6 +494,21 @@
     return tex;
   }
 
+  // the «subscribe to keep the house» board for a resident who does not follow the account
+  function followSignTexture(THREE, nick) {
+    const c = document.createElement("canvas");
+    c.width = 384; c.height = 122;
+    const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 384, 122);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = "#1B2129"; g.font = "900 28px Montserrat, sans-serif"; g.fillText("@" + nick, 192, 28, 360);
+    g.fillStyle = "#C8473D"; g.font = "800 24px Montserrat, sans-serif"; g.fillText("ПОДПИШИСЬ, ЧТОБЫ", 192, 66, 360);
+    g.fillText("СОХРАНИТЬ ДОМ", 192, 96, 360);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
   function signTexture(THREE, residentsCount) {
     const c = document.createElement("canvas");
     c.width = 512; c.height = 384;
@@ -638,7 +653,23 @@
         signHost.add(face);
         bizInfo = { kind: r.biz, title: biz.title, emoji: biz.emoji, label };
       }
+      if (r.follows === false) {
+        // not following (known from direct messages): a red board in front of the door, turned with the house
+        const t = biz ? 0 : v.turn, fx = Math.sin(t), fz = Math.cos(t);
+        const fb = new Builder(THREE).around(sx, sy, sz, 1, t);
+        fb.box(sx - 1.4, sy + 1.0, sz + 3.2, 0.14, 2.0, 0.14, C.log2).box(sx + 1.4, sy + 1.0, sz + 3.2, 0.14, 2.0, 0.14, C.log2);
+        fb.box(sx, sy + 1.75, sz + 3.22, 3.3, 1.15, 0.1, C.red);
+        signHost.add(fb.mesh());
+        const mat = new THREE.MeshBasicMaterial({ map: followSignTexture(THREE, r.nick) }), geo = new THREE.PlaneGeometry(3.1, 0.98);
+        const front = new THREE.Mesh(geo, mat), rear = new THREE.Mesh(geo, mat);
+        front.position.set(sx + fx * 3.29, sy + 1.75, sz + fz * 3.29);
+        front.rotation.y = t;
+        rear.position.set(sx + fx * 3.15, sy + 1.75, sz + fz * 3.15);
+        rear.rotation.y = t + Math.PI;
+        signHost.add(front, rear);
+      }
       houses.set(r.nick, {
+        follows: r.follows !== false,
         mesh,
         no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo,
         features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
