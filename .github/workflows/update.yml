@@ -30,6 +30,7 @@ jobs:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_USER_ID: ${{ vars.IG_USER_ID || '17841417700837854' }}
           DM_INVITE: ${{ vars.DM_INVITE }}
+          DM_ONLY: ${{ vars.DM_ONLY }}
           OSTROV_SITE_DATA: data
         run: |
           python tools/fetch_comments.py
