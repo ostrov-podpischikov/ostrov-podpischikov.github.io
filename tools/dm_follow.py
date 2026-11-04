@@ -131,7 +131,7 @@ def main():
             st["invited"].append(r["cid"])
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
-    convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(1){from,created_time}",
+    convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(5){from,created_time}",
                                                  "access_token": ptok})
     if err:
         print(f"Личные сообщения: переписки недоступны ({err})")
@@ -140,8 +140,15 @@ def main():
         only = {n.strip().lower().lstrip("@") for n in os.environ.get("DM_ONLY", "").split(",") if n.strip()}
         skipped = {}
         for conv in convs.get("data", []):
-            last = ((conv.get("messages") or {}).get("data") or [{}])[0]
+            # the API does not promise an order: take the newest of the last few messages
+            msgs = (conv.get("messages") or {}).get("data") or [{}]
+            last = max(msgs, key=lambda m: m.get("created_time", ""))
             sender = last.get("from") or {}
+            # the other side of the chat, even when our message is the newest (for the debug line)
+            other = next(((p.get("username") or "").lower() for p in (conv.get("participants") or {}).get("data", [])
+                          if p.get("id") != IG_ID), "")
+            if other in only and (sender.get("username") or "").lower() != other:
+                print(f"  тест @{other}: новейшее сообщение наше ({last.get('created_time')})")
             igsid, nick = sender.get("id"), (sender.get("username") or "").lower()
             reason = ("нет отправителя" if not igsid else "последнее — наше" if igsid == IG_ID
                       else "не житель" if nick not in residents else None)
