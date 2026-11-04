@@ -112,8 +112,10 @@ def main():
     if os.environ.get("DM_INVITE", "").lower() == "on" or args.dry_run:
         oldest = iso(now - timedelta(days=INVITE_MAX_AGE_DAYS))
         comments = {c["id"]: c for c in load(HERE / "comments.json", []) if c.get("id")}
+        # DM_ONLY="nick1,nick2" limits invitations to test accounts until Meta approves the permission
+        only = {n.strip().lower().lstrip("@") for n in os.environ.get("DM_ONLY", "").split(",") if n.strip()}
         todo = [r for r in residents.values() if r.get("cid") in comments and r["cid"] not in st["invited"]
-                and comments[r["cid"]]["time"][:19] >= oldest]
+                and comments[r["cid"]]["time"][:19] >= oldest and (not only or r["nick"] in only)]
         for r in todo[:MAX_INVITES_PER_RUN]:
             text = INVITE.format(no=r["no"])
             if args.dry_run:
