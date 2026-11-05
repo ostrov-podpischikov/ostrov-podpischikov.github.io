@@ -89,8 +89,14 @@ def wishes_by_nick():
     return out
 
 
+OWN = {"ostrov.podpischikov"}
+FRIENDS_MAX, REELS_MAX = 3, 2
+
+
 def quest_levels(nicks):
-    """nick → extra levels earned in comments: friends who tagged them (@nick, up to 2) and reels beyond the first (up to 2)."""
+    """nick → (extra levels, friends) earned in comments.
+    Friends: everyone the resident tagged with @nick, plus residents who tagged them — +1 each, up to 3.
+    Reels: every reel beyond the first one they commented on — +1 each, up to 2."""
     f = HERE / "comments.json"
     if not f.exists():
         return {}
@@ -103,13 +109,17 @@ def quest_levels(nicks):
         reels.setdefault(who, set()).add(c.get("reel"))
         for tagged in re.findall(r"@([a-z0-9._]+)", c.get("text", "").lower()):
             tagged = tagged.rstrip(".")
-            if tagged in nicks and tagged != who:
+            if not tagged or tagged == who.lower() or tagged in OWN:
+                continue
+            friends.setdefault(who, set()).add(tagged)  # tagging a friend brings them to the reel
+            if tagged in nicks:
                 friends.setdefault(tagged, set()).add(who)
     out = {}
     for nick in nicks:
-        bonus = min(2, len(friends.get(nick, ()))) + min(2, max(0, len(reels.get(nick, ())) - 1))
+        fr = len(friends.get(nick, ()))
+        bonus = min(FRIENDS_MAX, fr) + min(REELS_MAX, max(0, len(reels.get(nick, ())) - 1))
         if bonus:
-            out[nick] = bonus
+            out[nick] = (bonus, fr)
     return out
 
 
@@ -195,9 +205,11 @@ def main():
             del residents[nick]["wish"]
         residents[nick]["level"] = residents[nick]["level"] + int(g.get("levels", 0))
 
-    # quests from comments: a friend who tags you (+1 each, up to 2) and every extra reel you comment on (+1 each, up to 2)
-    for nick, bonus in quest_levels(set(residents)).items():
+    # quests from comments: friends tagged either way (+1 each, up to 3) and every extra reel you comment on (+1 each, up to 2)
+    for nick, (bonus, fr) in quest_levels(set(residents)).items():
         residents[nick]["level"] += bonus
+        if fr:
+            residents[nick]["fr"] = fr
     for r in residents.values():
         r["level"] = max(1, min(7, r["level"]))
 
