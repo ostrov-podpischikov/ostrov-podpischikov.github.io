@@ -191,7 +191,7 @@
     <div class="tour"><span class="em">💬</span><span><b>Оставь коммент под рилсом</b><small>получишь дом с ником над крышей</small></span></div>
     <div class="tour"><span class="em">🎁</span><span><b>Попроси вещь в комменте</b><small>флаг, лодка, лошадка, костёр, цвет крыши — появится во дворе</small></span></div>
     <div class="tour"><span class="em">📸</span><span><b>Отметь @ostrov.podpischikov в сторис</b><small>+1 уровень после проверки</small></span></div>
-    <div class="tour"><span class="em">👥</span><span><b>Позови друга</b><small>пусть отметит тебя @ником в комменте — +1 уровень за друга, до 2</small></span></div>
+    <div class="tour"><span class="em">👥</span><span><b>Отметь друга в комменте</b><small>напиши @ник друга под рилсом — +1 уровень за каждого, до 3</small></span></div>
     <div class="tour"><span class="em">🔁</span><span><b>Комментируй новые рилсы</b><small>каждый следующий рилс — +1 уровень, до 2</small></span></div>
     <div class="tour"><span class="em">✈️</span><span><b>Привяжи ник в Telegram-боте</b><small>ракушки и прокачка — скоро и на карте</small></span></div>
     <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 К рилсам</a>
@@ -201,7 +201,7 @@
   <div class="panel drawer" id="goals">
     <div class="dtop"><h2>ЦЕЛИ ОСТРОВА</h2><button class="x" data-shut="goals">×</button></div>
     <div id="goalList"></div>
-    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">💬 Позови друга — пусть напишет коммент</a>
+    <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">👥 Отметь друга @ником в комменте</a>
   </div>
 
   <div class="panel drawer" id="polls">
@@ -518,6 +518,7 @@
             : `<div><span>Дом</span><span>${(h.kind || lv).emoji} ${(h.kind || lv).name}</span></div>
           ${h.follows === false ? `<div><span>⚠️ Подписка</span><span>подпишись, чтобы сохранить дом</span></div>` : ""}
           <div><span>Уровень</span><span>${h.level} из 7 · ${lv.emoji} ${lv.name}${h.level < 7 ? " → " + OstrovIsland.LEVELS[h.level].name : ""}</span></div>
+          <div><span>👥 Друзей позвал</span><span>${r.fr ? Math.min(3, r.fr) + " из 3" : "0 — отметь друга @ником в комменте"}</span></div>
           <div><span>Во дворе</span><span>${(h.features || []).join(" · ") || "—"}</span></div>`}
         </div>
         <div class="actions">
