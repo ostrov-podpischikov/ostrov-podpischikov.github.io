@@ -775,8 +775,37 @@
     sign.rotation.y = -0.6;
     group.add(sign);
 
+    // the lighthouse everyone built together (goal 500, day 5): on a rock past the pier, with a turning beam
+    const lighthouse = buildLighthouse(THREE, new THREE.Vector3(2.5, 0, pz + 14));
+    group.add(lighthouse.group);
+
     const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
-    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS };
+    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse };
+  }
+
+  function buildLighthouse(THREE, at) {
+    const g = new THREE.Group();
+    const box = (x, y, z, w, h, d, col, basic) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), basic ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshLambertMaterial({ color: col }));
+      m.position.set(x, y, z); g.add(m); return m;
+    };
+    box(0, 0.8, 0, 7, 1.6, 7, "#8A8F96"); box(1.2, 1.2, 1.4, 3, 1.4, 3, "#9EA3AA"); box(-1.6, 1.0, -1.2, 2.6, 1.6, 2.4, "#7C8188");
+    let y = 1.6;
+    for (let k = 0; k < 8; k++) { const w = 3.4 - k * 0.14; box(0, y + 1.1, 0, w, 2.2, w, k % 2 ? "#FFFFFF" : "#D9433B"); y += 2.2; }
+    box(0, y + 0.2, 0, 3.6, 0.4, 3.6, "#2B2F36");
+    [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]].forEach(([a, c]) => box(a, y + 0.9, c, 0.15, 1.0, 0.15, "#2B2F36"));
+    box(0, y + 1.4, 0, 1.9, 1.8, 1.9, "#FFE27A", true);
+    box(0, y + 2.6, 0, 2.4, 0.6, 2.4, "#D9433B"); box(0, y + 3.2, 0, 1.2, 0.6, 1.2, "#D9433B");
+    const beam = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: "#FFF3B0", transparent: true, opacity: 0.22, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    [1, -1].forEach((s) => {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(4, 36, 24, 1, true), mat);
+      cone.rotation.z = s * Math.PI / 2; cone.position.x = -s * 18; beam.add(cone);
+    });
+    beam.position.y = y + 1.4;
+    g.add(beam);
+    g.position.copy(at);
+    return { group: g, beam, pos: at.clone(), top: at.clone().add(new THREE.Vector3(0, y + 3.5, 0)) };
   }
 
   root.OstrovIsland = { build, plotCell, look, LEVELS, FEATURES, PLOT, BIZ };
