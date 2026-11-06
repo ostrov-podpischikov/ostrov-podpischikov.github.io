@@ -135,7 +135,7 @@ def write_atomic(path, text):
 
 def tally_polls():
     """Votes from comments: an option number as a standalone number, or a word from the option.
-    One vote per person — their latest comment that votes for something."""
+    One vote per person — their latest comment that votes for something; a poll with "each": true counts every comment."""
     cfg_file, com_file = HERE / "polls.json", HERE / "comments.json"
     if not cfg_file.exists():
         return []
@@ -146,7 +146,8 @@ def tally_polls():
     for p in polls:
         votes = {}
         for c in comments:
-            if c["time"][:10] < p.get("since", ""):
+            since = p.get("since", "")   # a date, or a UTC time like 2026-11-06T18:40
+            if c["time"][:len(since)] < since:
                 continue
             text = c.get("text", "").lower().replace("ё", "е")
             words = re.findall(r"[a-zа-я]+", text)
@@ -155,7 +156,7 @@ def tally_polls():
             hit = hit or next((o["key"] for o in p["options"]
                                if any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words)), None)
             if hit and c.get("username"):
-                votes[c["username"]] = hit
+                votes[c.get("id") or (c["username"], c["time"]) if p.get("each") else c["username"]] = hit
         counts = {o["key"]: 0 for o in p["options"]}
         for k in votes.values():
             counts[k] += 1
