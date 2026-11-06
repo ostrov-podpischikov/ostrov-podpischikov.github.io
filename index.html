@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=7"></script>
+  <script src="island.js?v=8"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -443,6 +443,7 @@
       // keep the view over the island: dragging can't carry it out to the open ocean
       const lim = island ? island.radius * 1.1 : 0, t = controls.target, d = Math.hypot(t.x, t.z);
       if (lim && d > lim) { panOffset.set(t.x, 0, t.z).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
+      if (island && island.lighthouse) island.lighthouse.beam.rotation.y = now / 1600;
       if (marker.visible) { marker.position.y = marker.userData.y + Math.sin(now / 250) * 0.4; marker.rotation.y = now / 600; }
       renderer.render(scene, camera);
       drawLabels();
@@ -587,6 +588,7 @@
         ["🔥", "Центральная площадь", "Костёр, табличка и шалаш основателя", () => flyTo(V(1.2, 6.8, -1.6), V(-5, 9.5, 9))],
         ["🌴", "Пальмовый квартал", "Первые жители острова", () => { const h = island.houses.get(residents[0] && residents[0].nick); if (h) find(h.nick); }],
         ["⚓", "Причал", "Лодка и вид на океан", () => flyTo(island.pier, island.pier.clone().add(V(-9, 7, 11)))],
+        ["🗼", "Маяк", "Построили вместе — 500 жителей. Следующая цель: 1000 = порт ⚓", () => { const l = island.lighthouse; flyTo(l.pos.clone().add(V(0, 24, 0)), l.pos.clone().add(V(-30, 18, 42))); }],
       ];
       const biz = list.filter((h) => h.biz);
       items.push(["🏪", "Бизнесы острова", biz.length ? `${biz.length} ${plural(biz.length, "бизнес", "бизнеса", "бизнесов")} · напиши в комменте «хочу кафе» — и он твой` : "Напиши в комменте «хочу кафе» или «шаурму» — откроем твой бизнес", () => { if (biz.length) find(biz[Math.floor(Math.random() * biz.length)].nick); }]);
