@@ -57,17 +57,20 @@
   const strHash = (s, salt) => { let h = 2166136261 ^ (salt || 0); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
   const pick = (arr, r) => arr[Math.floor(r * arr.length) % arr.length];
 
-  // plot order: grid cells sorted by distance from the centre, ties broken by angle; centre cell is the plaza.
-  // Only cells inside the full circle of radius k are kept, so growing k never reorders earlier plots.
+  // the island's outline: radius factor by angle — lobes, capes and bays instead of a circle (min ≈ 0.5, max ≈ 1.5)
+  const SHAPE = (a) => 1 + 0.22 * Math.sin(2 * a + 0.9) + 0.16 * Math.sin(3 * a + 2.6) + 0.09 * Math.sin(5 * a + 0.4) + 0.05 * Math.sin(8 * a + 3.1);
+  // plot order: grid cells sorted by "shape distance" (distance / SHAPE(angle)) from the centre, so the town grows in
+  // the island's outline; ties broken by angle; centre cell is the plaza.
+  // Only cells inside shape distance k are kept, so growing k never reorders earlier plots.
   let PLOTS = [];
   function plotCell(no) {
     const idx = no - 2; // №1 — сам остров (площадь в центре)
     let k = 8;
     while (PLOTS.length <= idx) {
       k *= 2;
-      const cells = [];
-      for (let i = -k; i <= k; i++) for (let j = -k; j <= k; j++) {
-        const d = Math.hypot(i, j);
+      const cells = [], m = Math.ceil(k * 1.6);
+      for (let i = -m; i <= m; i++) for (let j = -m; j <= m; j++) {
+        const d = Math.hypot(i, j) / SHAPE(Math.atan2(j, i));
         if ((i === 0 && j === 0) || d > k) continue;
         cells.push([i, j, d, Math.atan2(j, i)]);
       }
@@ -608,9 +611,10 @@
     const emptyCells = [];
     for (let k = 1; k <= (opts.emptyPlots || 0); k++) { const c = plotCell(lastNo + k); far = Math.max(far, c[2]); emptyCells.push(c); }
     // the coast: never closer than Rb (the outer plots keep their grass), bulging into capes elsewhere
-    const Rb = Math.max(18, (far + 0.5) * PLOT + 9);
-    const wave = (a) => 0.5 * Math.sin(2 * a + 1.3) + 0.3 * Math.sin(3 * a + 4.1) + 0.2 * Math.sin(5 * a + 2.2) + 0.12 * Math.sin(7 * a + 0.7);
-    const coast = (a) => Rb * (1 + 0.32 * Math.max(0, wave(a) + 0.25));
+    // far is in shape units: the coast follows the same outline as the town, plus a beach and a few small capes
+    const Rb = Math.max(18, (far + 0.5) * PLOT);
+    const wave = (a) => 0.5 * Math.sin(4 * a + 1.3) + 0.3 * Math.sin(6 * a + 4.1) + 0.2 * Math.sin(11 * a + 2.2) + 0.12 * Math.sin(17 * a + 0.7);
+    const coast = (a) => Rb * SHAPE(a) + 9 + Rb * 0.12 * Math.max(0, wave(a) + 0.2);
     const coastAt = (x, z) => coast(Math.atan2(z, x));
     let R = Rb;
     for (let k = 0; k < 360; k++) R = Math.max(R, coast((k / 360) * Math.PI * 2));
