@@ -161,8 +161,10 @@ def find_vote(text, polls, when):
     words = re.findall(r"[a-zа-я]+", text)
     numbers = set(re.findall(r"(?<!\d)\d(?!\d)", text))
     for p in polls:
-        if when[:10] < p.get("since", ""):
+        if when[:10] < p.get("since", "")[:10]:
             continue
+        if p.get("until") and when[:len(p["until"])] >= p["until"]:
+            continue  # a closed vote: no «голос засчитан» replies
         for o in p["options"]:
             if o["key"] in numbers or any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words):
                 return o["label"]
