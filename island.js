@@ -544,14 +544,14 @@
   }
 
   // the empty-plot board, styled like the city's «free flats» sign: white, yellow edge, two dark lines
-  function emptySignTexture(THREE, no) {
+  function emptySignTexture(THREE, no, follower) {
     const c = document.createElement("canvas");
     c.width = 384; c.height = 118;
     const g = c.getContext("2d");
     g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 384, 118);
     g.textAlign = "center"; g.textBaseline = "middle";
     // the plot waits for a follower who has not commented yet: their place in line, and the one step left
-    g.fillStyle = "#1B2129"; g.font = "900 30px Montserrat, sans-serif"; g.fillText("ДЛЯ ПОДПИСЧИКА №" + no, 192, 30, 360);
+    g.fillStyle = "#1B2129"; g.font = "900 30px Montserrat, sans-serif"; g.fillText(follower ? "УЧАСТОК ПОДПИСЧИКА" : "ДЛЯ ПОДПИСЧИКА №" + no, 192, 30, 360);
     g.fillStyle = "#C8473D"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("НАПИШИ КОММЕНТ —", 192, 66, 360);
     g.fillStyle = "#1B2129"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("И ДОМ ТВОЙ", 192, 96, 360);
     const tex = new THREE.CanvasTexture(c);
@@ -677,9 +677,22 @@
     });
 
     // houses; with opts.perHouse every house is its own mesh (origin at its plot) so videos can animate them
+    const named = [];
     rows.forEach((r, k) => {
       const [i, j, d] = cells[k];
       const x = i * PLOT, z = j * PLOT, y = 2;
+      // a follower who has not commented yet: their plot is staked out and waits (drawn with the empty plots below)
+      if (r.plot) {
+        named.push([i, j]);
+        houses.set(r.nick, {
+          follows: true, mesh: null, plot: true,
+          no: r.no, nick: r.nick, level: 1, cell: [i, j], ring: d, biz: null,
+          features: ["📍 участок ждёт — напиши любой коммент, и тут вырастет дом"], wished: false,
+          pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + 3.2, z),
+          kind: { name: "Участок", emoji: "📍" }, face: 0,
+        });
+        return;
+      }
       const lvl = Math.min(7, Math.max(1, r.level || 1));
       const v = look(r, lite);
       const biz = BIZ[r.biz];
@@ -749,7 +762,7 @@
     });
 
     // empty plots: corner stakes, a rope and a little sign — «your place is waiting»
-    emptyCells.forEach(([i, j]) => {
+    emptyCells.concat(named).forEach(([i, j]) => {
       const x = i * PLOT, z = j * PLOT, y = 2, s = (PLOT - STREET) / 2 - 0.4;
       b.box(x, y + 0.05, z, PLOT - STREET - 0.4, 0.1, PLOT - STREET - 0.4, C.sand2);
       [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
@@ -770,6 +783,17 @@
       back.rotation.y = Math.PI;
       group.add(front, back);
     });
+    // followers' plots share one board (hundreds of canvases would not fit a phone); the nick floats above as a label
+    if (named.length) {
+      const mat = new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE, 0, true) });
+      named.forEach(([i, j]) => {
+        const front = new THREE.Mesh(plateGeo, mat), back = new THREE.Mesh(plateGeo, mat);
+        front.position.set(i * PLOT, 4.0, j * PLOT + 0.68);
+        back.position.set(i * PLOT, 4.0, j * PLOT + 0.56);
+        back.rotation.y = Math.PI;
+        group.add(front, back);
+      });
+    }
 
     // plaza: big campfire, log benches, the founder's hut and the sign
     b.box(0, 2.06, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
@@ -805,7 +829,7 @@
     const post = new Builder(THREE);
     post.box(-1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(0, 2.45, 0.28, 3.4, 2.5, 0.2, "#7A4F2A");
     sign.add(post.mesh());
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 2.45), new THREE.MeshLambertMaterial({ map: signTexture(THREE, rows.length + 1) }));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 2.45), new THREE.MeshLambertMaterial({ map: signTexture(THREE, rows.filter((r) => !r.plot).length + 1) }));
     // the board hangs in front of the posts, otherwise they cover the edges of «ЖИТЕЛЕЙ: N»
     face.position.set(0, 2.45, 0.39);
     sign.add(face);
