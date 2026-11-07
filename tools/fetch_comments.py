@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -129,18 +130,54 @@ def main():
     if args.last:
         media = media[-args.last:]
 
+    # cache of earlier runs (kept by actions/cache, not in the repo): a viral reel has tens of thousands of comments
+    # and a full re-read took over 30 minutes. When the API lists newest first, paging stops at the first page that
+    # holds nothing new and the rest comes from the cache; past the time budget every reel falls back to the cache.
+    cache_file = HERE / "comments.json"
+    try:
+        cached = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else []
+    except ValueError:
+        cached = []
+    by_reel = {}
+    for c in cached:
+        by_reel.setdefault(c.get("reel"), []).append(c)
+    deadline = time.time() + float(os.environ.get("FETCH_BUDGET_MIN", "15")) * 60
+
     comments = []
     for n, m in enumerate(media, 1):
-        got = 0
+        got, stopped = 0, ""
+        old_list = by_reel.get(m["permalink"], [])
+        old_ids = {c["id"] for c in old_list if c.get("id")}
+        seen = set()
         fields = "id,text,username,timestamp,replies{id,text,username,timestamp}"
-        for c in pages(f"{m['id']}/comments", token, fields=fields, limit=50):
-            # replies inside a thread («я тоже») count as comments too
-            for x in [c] + c.get("replies", {}).get("data", []):
-                comments.append({"id": x.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (x.get("username") or "").lower(),
-                                 "text": x.get("text", ""), "time": x["timestamp"], "reply": x is not c,
-                                 "parent": c.get("id") if x is not c else None})
-                got += 1
-        print(f"  рилс {n}: {m['permalink']}  комментов {got} (по счётчику {m.get('comments_count', '?')})")
+        url = None
+        data = None
+        while True:
+            if time.time() > deadline and old_list:
+                stopped = "время вышло — остальное из кэша"
+                break
+            data = get(url, token) if url else get(f"{m['id']}/comments", token, fields=fields, limit=50)
+            page = data.get("data", [])
+            for c in page:
+                # replies inside a thread («я тоже») count as comments too
+                for x in [c] + c.get("replies", {}).get("data", []):
+                    seen.add(x.get("id"))
+                    comments.append({"id": x.get("id"), "reel": m["permalink"], "reel_time": m["timestamp"], "username": (x.get("username") or "").lower(),
+                                     "text": x.get("text", ""), "time": x["timestamp"], "reply": x is not c,
+                                     "parent": c.get("id") if x is not c else None})
+                    got += 1
+            newest_first = len(page) > 1 and page[0]["timestamp"] >= page[-1]["timestamp"]
+            if page and newest_first and old_ids and all(c.get("id") in old_ids for c in page):
+                stopped = "дальше без новых — из кэша"
+                break
+            url = data.get("paging", {}).get("next")
+            if not url:
+                break
+        if stopped:
+            rest = [c for c in old_list if c.get("id") not in seen]
+            comments.extend(rest)
+            got += len(rest)
+        print(f"  рилс {n}: {m['permalink']}  комментов {got} (по счётчику {m.get('comments_count', '?')}){'  · ' + stopped if stopped else ''}")
 
     # residents: unique commenters by first comment, the account itself excluded; existing numbers are kept
     out = HERE / "residents.json"
