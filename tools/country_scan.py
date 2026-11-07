@@ -47,6 +47,14 @@ for c in comments:
         if any((k in t) if not k[0].isalpha() else any(w.startswith(k.strip()) for w in words) for k in keys):
             cnt[name] = cnt.get(name, 0) + 1
             people.setdefault(name, set()).add(c.get("username", ""))
+# flag emojis: comments that are only flags, and every flag emoji counted one by one
+FLAGS = {"Кыргызстан": "🇰🇬", "Казахстан": "🇰🇿", "Узбекистан": "🇺🇿", "Таджикистан": "🇹🇯", "Россия": "🇷🇺", "Азербайджан": "🇦🇿"}
+print("Флаги-эмодзи: комментов с флагом / только флаги без слов / всего флажков:")
+for name, fl in FLAGS.items():
+    with_flag = [c.get("text", "") for c in comments if fl in c.get("text", "")]
+    only = sum(1 for t in with_flag if not re.search(r"[a-zа-яё]", t.lower()))
+    total = sum(t.count(fl) for t in with_flag)
+    print(f"  {name}: {len(with_flag)} / {only} / {total}")
 print(f"Страны в комментах (всего комментов {len(comments)}):")
 for name, n in sorted(cnt.items(), key=lambda kv: -kv[1]):
     print(f"  {name}: {n} комментов, {len(people[name])} человек")
