@@ -83,42 +83,77 @@
   let FLAT_MAT = null;
   const flatMaterial = (T) => FLAT_MAT || (FLAT_MAT = new T.MeshLambertMaterial({ vertexColors: true }));
 
-  function Builder(THREE) { this.T = THREE; this.pos = []; this.nor = []; this.col = []; this.uv = []; this.xf = null; }
+  function Builder(THREE) { this.T = THREE; this.xf = null; }
   // boxes added after around(x, y, z, s, turn) are scaled by s and turned by turn about that point; around() with no args resets
   Builder.prototype.around = function (x, y, z, s, turn) {
     const T = this.T;
     this.xf = s ? new T.Matrix4().makeTranslation(x, y, z).multiply(new T.Matrix4().makeRotationY(turn || 0)).multiply(new T.Matrix4().makeScale(s, s, s)).multiply(new T.Matrix4().makeTranslation(-x, -y, -z)) : null;
     return this;
   };
+  // growable typed arrays: thousands of houses would not fit in plain JS number arrays on a phone
+  function Grow(Type, n) { this.T = Type; this.a = new Type(n); this.n = 0; }
+  Grow.prototype.room = function (k) {
+    if (this.n + k <= this.a.length) return;
+    let len = this.a.length * 2; while (len < this.n + k) len *= 2;
+    const b = new this.T(len); b.set(this.a); this.a = b;
+  };
+  Grow.prototype.view = function () { return this.a.slice(0, this.n); };
+  const FACES = [ // normal, then the two in-plane axes (u, v) with u × v = normal
+    [[1, 0, 0], [0, 0, -1], [0, 1, 0]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+    [[0, 1, 0], [1, 0, 0], [0, 0, -1]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
+    [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
+  ];
+  const _m = [], _c = [];
   Builder.prototype.box = function (x, y, z, w, h, d, top, side, rotZ, rotY, rotX) {
     const T = this.T;
-    const g = new T.BoxGeometry(w, h, d).toNonIndexed();
-    const m = new T.Matrix4().makeRotationFromEuler(new T.Euler(rotX || 0, rotY || 0, rotZ || 0));
+    if (!this.P) { this.P = new Grow(Float32Array, 1 << 14); this.N = new Grow(Float32Array, 1 << 14); this.C = new Grow(Float32Array, 1 << 14); this.U = new Grow(Float32Array, 1 << 13); this.I = new Grow(Uint32Array, 1 << 14); }
+    const m = (_m[0] || (_m[0] = new T.Matrix4())).makeRotationFromEuler((_m[1] || (_m[1] = new T.Euler())).set(rotX || 0, rotY || 0, rotZ || 0));
     m.setPosition(x, y, z);
-    g.applyMatrix4(m);
-    if (this.xf) g.applyMatrix4(this.xf);
-    const p =g.attributes.position.array, n = g.attributes.normal.array;
-    const ct = new T.Color(top), cs = new T.Color(side || top), cb = cs.clone().multiplyScalar(0.82);
-    for (let i = 0; i < p.length; i += 3) {
-      this.pos.push(p[i], p[i + 1], p[i + 2]);
-      this.nor.push(n[i], n[i + 1], n[i + 2]);
-      const c = n[i + 1] > 0.5 ? ct : Math.abs(n[i]) > 0.5 ? cb : cs;
-      this.col.push(c.r, c.g, c.b);
-      // world-space UVs, so the pixel texture has the same pixel size on every face of every box
-      const ax = Math.abs(n[i]), ay = Math.abs(n[i + 1]);
-      if (ay >= ax && ay >= Math.abs(n[i + 2])) this.uv.push(p[i] / PIXEL_TILE, p[i + 2] / PIXEL_TILE);
-      else if (ax >= Math.abs(n[i + 2])) this.uv.push(p[i + 2] / PIXEL_TILE, p[i + 1] / PIXEL_TILE);
-      else this.uv.push(p[i] / PIXEL_TILE, p[i + 1] / PIXEL_TILE);
+    if (this.xf) m.premultiply(this.xf);
+    const e = m.elements;
+    const ct = (_c[0] || (_c[0] = new T.Color())).set(top), cs = (_c[1] || (_c[1] = new T.Color())).set(side || top);
+    const cbr = cs.r * 0.82, cbg = cs.g * 0.82, cbb = cs.b * 0.82;
+    const hw = w / 2, hh = h / 2, hd = d / 2, flat = !rotX && !rotZ;
+    const P = this.P, N = this.N, Cc = this.C, U = this.U, I = this.I;
+    for (let f = 0; f < 6; f++) {
+      // the underside of an upright box rests on something and is never seen
+      if (f === 3 && flat) continue;
+      const [nn, uu, vv] = FACES[f];
+      let nx = e[0] * nn[0] + e[4] * nn[1] + e[8] * nn[2], ny = e[1] * nn[0] + e[5] * nn[1] + e[9] * nn[2], nz = e[2] * nn[0] + e[6] * nn[1] + e[10] * nn[2];
+      const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+      let r, g, bl;
+      if (ny > 0.5) { r = ct.r; g = ct.g; bl = ct.b; } else if (ax > 0.5) { r = cbr; g = cbg; bl = cbb; } else { r = cs.r; g = cs.g; bl = cs.b; }
+      const base = P.n / 3;
+      P.room(12); N.room(12); Cc.room(12); U.room(8); I.room(6);
+      for (let q = 0; q < 4; q++) {
+        const su = q === 1 || q === 2 ? 1 : -1, sv = q >= 2 ? 1 : -1;
+        const lx = (nn[0] + su * uu[0] + sv * vv[0]) * hw, ly = (nn[1] + su * uu[1] + sv * vv[1]) * hh, lz = (nn[2] + su * uu[2] + sv * vv[2]) * hd;
+        const px = e[0] * lx + e[4] * ly + e[8] * lz + e[12], py = e[1] * lx + e[5] * ly + e[9] * lz + e[13], pz = e[2] * lx + e[6] * ly + e[10] * lz + e[14];
+        P.a[P.n++] = px; P.a[P.n++] = py; P.a[P.n++] = pz;
+        N.a[N.n++] = nx; N.a[N.n++] = ny; N.a[N.n++] = nz;
+        Cc.a[Cc.n++] = r; Cc.a[Cc.n++] = g; Cc.a[Cc.n++] = bl;
+        // world-space UVs, so the pixel texture has the same pixel size on every face of every box
+        if (ay >= ax && ay >= az) { U.a[U.n++] = px / PIXEL_TILE; U.a[U.n++] = pz / PIXEL_TILE; }
+        else if (ax >= az) { U.a[U.n++] = pz / PIXEL_TILE; U.a[U.n++] = py / PIXEL_TILE; }
+        else { U.a[U.n++] = px / PIXEL_TILE; U.a[U.n++] = py / PIXEL_TILE; }
+      }
+      I.a[I.n++] = base; I.a[I.n++] = base + 1; I.a[I.n++] = base + 2; I.a[I.n++] = base; I.a[I.n++] = base + 2; I.a[I.n++] = base + 3;
     }
-    g.dispose();
     return this;
   };
   Builder.prototype.mesh = function () {
     const T = this.T, g = new T.BufferGeometry();
-    g.setAttribute("position", new T.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute("normal", new T.Float32BufferAttribute(this.nor, 3));
-    g.setAttribute("color", new T.Float32BufferAttribute(this.col, 3));
-    g.setAttribute("uv", new T.Float32BufferAttribute(this.uv, 2));
+    if (this.P) {
+      const verts = this.P.n / 3;
+      g.setAttribute("position", new T.BufferAttribute(this.P.view(), 3));
+      g.setAttribute("normal", new T.BufferAttribute(this.N.view(), 3));
+      g.setAttribute("color", new T.BufferAttribute(this.C.view(), 3));
+      g.setAttribute("uv", new T.BufferAttribute(this.U.view(), 2));
+      g.setIndex(new T.BufferAttribute(verts > 65535 ? this.I.view() : Uint16Array.from(this.I.view()), 1));
+      this.P = this.N = this.C = this.U = this.I = null;
+    }
+    g.computeBoundingSphere();
     const mesh = new T.Mesh(g, flatMaterial(T));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -471,7 +506,7 @@
   }
 
   /** Appearance of one resident: stable for a nick, wishes from comments add details. */
-  function look(r) {
+  function look(r, lite) {
     const n = r.nick, wish = r.wish || [];
     const straw = pick(STRAW, strHash(n, 1)), canvas = pick(CANVAS, strHash(n, 2));
     const wall = pick(WALLS, strHash(n, 7)), mud = pick(MUD, strHash(n, 8)), hull = pick(HULLS, strHash(n, 9));
@@ -489,8 +524,8 @@
     if (colorWish && v.hut === 7) { v.h1 = COLORS[colorWish]; }
     else if (colorWish && v.hut !== 3) { v.c1 = COLORS[colorWish]; }
     wish.forEach((w) => { if (ITEMS[w] && !v.items.includes(w)) v.items.push(w); });
-    // one or two random yard items on top of the wished ones, four at most
-    const want = Math.min(4, v.items.length + 1 + (strHash(n, 6) < 0.45 ? 1 : 0));
+    // one or two random yard items on top of the wished ones, four at most; a crowded island keeps only every third one
+    const want = lite ? v.items.length + (strHash(n, 6) < 0.33 ? 1 : 0) : Math.min(4, v.items.length + 1 + (strHash(n, 6) < 0.45 ? 1 : 0));
     for (let k = 0; v.items.length < want && k < 20; k++) {
       const it = ACCESSORIES[Math.floor(strHash(n, 10 + k) * ACCESSORIES.length)];
       if (!v.items.includes(it)) v.items.push(it);
@@ -583,20 +618,24 @@
     emptyCells.forEach((c) => occupied.add(c[0] + "," + c[1]));
     occupied.add("0,0");
 
+    // a crowded island: fewer random yard items and torches, coarser terrain columns (each column is a box)
+    const lite = rows.length > 2000;
+    const TS = Math.max(TERRAIN, R * Math.sqrt(Math.PI / 25000));
+
     // terrain columns
     const terrain = new Builder(THREE);
     const tops = new Map();
-    const n = Math.ceil(R / TERRAIN) + 1;
+    const n = Math.ceil(R / TS) + 1;
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
-      const x = i * TERRAIN, z = j * TERRAIN;
+      const x = i * TS, z = j * TS;
       const r = Math.hypot(x, z) + (hash(i, j) - 0.5) * 2.4, edge = coastAt(x, z);
       if (r > edge) continue;
-      const grass = r < edge - 6, top = grass ? 2 : 1;
+      const grass = r < edge - Math.max(6, TS * 1.5), top = grass ? 2 : 1;
       const ct = grass ? (hash(i * 3, j) < 0.5 ? C.grass : C.grass2) : (hash(i, j * 2) < 0.5 ? C.sand : C.sand2);
-      terrain.box(x, (top - 3) / 2, z, TERRAIN, top + 3, TERRAIN, ct, grass ? C.soil : C.sand2);
+      terrain.box(x, (top - 3) / 2, z, TS, top + 3, TS, ct, grass ? C.soil : C.sand2);
       tops.set(i + "," + j, top);
     }
-    const topAt = (x, z) => tops.get(Math.round(x / TERRAIN) + "," + Math.round(z / TERRAIN)) || 0;
+    const topAt = (x, z) => tops.get(Math.round(x / TS) + "," + Math.round(z / TS)) || 0;
     // flat ground only receives shadows: casting onto itself gave shadow acne that made the whole island shimmer on phones
     const ground = terrain.mesh();
     ground.castShadow = false;
@@ -634,7 +673,7 @@
     corners.forEach((s) => {
       const [i, j] = s.split(",").map(Number);
       const x = i * PLOT - H, z = j * PLOT - H;
-      if (topAt(x, z) === 2 && hash(i + 31, j - 17) < 0.28) ITEMS.torch(b, x + STREET / 2 + 0.1, 2, z + STREET / 2 + 0.1);
+      if (topAt(x, z) === 2 && hash(i + 31, j - 17) < (lite ? 0.06 : 0.28)) ITEMS.torch(b, x + STREET / 2 + 0.1, 2, z + STREET / 2 + 0.1);
     });
 
     // houses; with opts.perHouse every house is its own mesh (origin at its plot) so videos can animate them
@@ -642,7 +681,7 @@
       const [i, j, d] = cells[k];
       const x = i * PLOT, z = j * PLOT, y = 2;
       const lvl = Math.min(7, Math.max(1, r.level || 1));
-      const v = look(r);
+      const v = look(r, lite);
       const biz = BIZ[r.biz];
       b.box(x, y + 0.05, z, PLOT - STREET, 0.1, PLOT - STREET, biz ? C.stone : C.pad);
       // a business replaces the hut; its own props stand where the yard items would be
