@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=10"></script>
+  <script src="island.js?v=11"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -308,9 +308,9 @@
     // milestones: what the island gets when it reaches each count (shown under the progress bar and in «Цели острова»)
     const GOALS = [
       { n: 250, emoji: "🎡", title: "колесо обозрения", what: "на центральной площади" },
-      { n: 500, emoji: "🏖", title: "пляж с лежаками", what: "зонтики, лежаки и бар у воды" },
-      { n: 1000, emoji: "🌉", title: "второй остров", what: "и мост к нему — новые участки" },
-      { n: 2500, emoji: "🛥", title: "яхт-клуб", what: "пирс с яхтами вокруг острова" },
+      { n: 500, emoji: "🗼", title: "маяк", what: "на скале за причалом — построили на 5-й день" },
+      { n: 1000, emoji: "⚓", title: "порт", what: "краны, контейнеры и грузовой корабль" },
+      { n: 3000, emoji: "🌍", title: "острова стран", what: "у каждой страны свой остров рядом с нашим" },
       { n: 5000, emoji: "🌋", title: "вулкан", what: "на самом большом мысе" },
       { n: 10000, emoji: "✈️", title: "аэропорт", what: "свой самолёт над островом" },
       { n: 50000, emoji: "🏙", title: "архипелаг", what: "острова-районы для жителей" },
@@ -593,8 +593,9 @@
         ["🔥", "Центральная площадь", "Костёр, табличка и шалаш основателя", () => flyTo(V(1.2, 6.8, -1.6), V(-5, 9.5, 9))],
         ["🌴", "Пальмовый квартал", "Первые жители острова", () => { const h = island.houses.get(residents[0] && residents[0].nick); if (h) find(h.nick); }],
         ["⚓", "Причал", "Лодка и вид на океан", () => flyTo(island.pier, island.pier.clone().add(V(-9, 7, 11)))],
-        ["🗼", "Маяк", "Построили вместе — 500 жителей. Следующая цель: 1000 = порт ⚓", () => { const l = island.lighthouse; flyTo(l.pos.clone().add(V(0, 24, 0)), l.pos.clone().add(V(-30, 18, 42))); }],
+        ["🗼", "Маяк", "Построили вместе — 500 жителей", () => { const l = island.lighthouse; flyTo(l.pos.clone().add(V(0, 24, 0)), l.pos.clone().add(V(-30, 18, 42))); }],
       ];
+      if (island.port) items.push(["⚓", "Порт", "Построили вместе — 1000 жителей. Следующая цель: 3000 = острова стран 🌍", () => { const p = island.port.pos; flyTo(p.clone().add(V(0, 4, 0)), p.clone().add(V(-24, 22, 40))); }]);
       const biz = list.filter((h) => h.biz);
       items.push(["🏪", "Бизнесы острова", biz.length ? `${biz.length} ${plural(biz.length, "бизнес", "бизнеса", "бизнесов")} · напиши в комменте «хочу кафе» — и он твой` : "Напиши в комменте «хочу кафе» или «шаурму» — откроем твой бизнес", () => { if (biz.length) find(biz[Math.floor(Math.random() * biz.length)].nick); }]);
       if (wished.length) items.push(["🚩", "Исполненные желания", `${wished.length} ${plural(wished.length, "дом", "дома", "домов")} по просьбам из комментов`, () => find(wished[Math.floor(Math.random() * wished.length)].nick)]);
