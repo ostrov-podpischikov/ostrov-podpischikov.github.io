@@ -188,7 +188,8 @@
   <div class="panel drawer" id="quests">
     <div class="dtop"><h2>ПРОКАЧАЙ ДОМ</h2><button class="x" data-shut="quests">×</button></div>
     <div class="gsub">Шалаш → Хижина → Домик → Коттедж → Особняк → Вилла → Маяк. Каждое задание — +1 уровень.</div>
-    <div class="tour"><span class="em">💬</span><span><b>Оставь коммент под рилсом</b><small>получишь дом с ником над крышей</small></span></div>
+    <div class="tour"><span class="em">🏠</span><span><b>Подпишись на @ostrov.podpischikov</b><small>получишь дом с ником над крышей</small></span></div>
+    <div class="tour"><span class="em">💬</span><span><b>Оставь коммент под рилсом</b><small>+1 уровень дома</small></span></div>
     <div class="tour"><span class="em">🎁</span><span><b>Попроси вещь в комменте</b><small>флаг, лодка, лошадка, машина, бассейн, мотоцикл, попугай, цвет крыши — появится во дворе</small></span></div>
     <div class="tour"><span class="em">📸</span><span><b>Отметь @ostrov.podpischikov в сторис</b><small>+1 уровень после проверки</small></span></div>
     <div class="tour"><span class="em">👥</span><span><b>Отметь друга в комменте</b><small>напиши @ник друга под рилсом — +1 уровень за каждого, до 3</small></span></div>
@@ -238,8 +239,8 @@
     <h2>Не нашёл свой дом?</h2>
     <ol>
       <li>Подпишись на <b>@ostrov.podpischikov</b></li>
-      <li>Напиши любой коммент под последним рилсом — можно попросить флаг, костёр, лодку или цвет крыши 🚩</li>
-      <li>Через 15 минут твой шалаш появится на острове. Ищи ник без «@»</li>
+      <li>Всё — дом твой! Он появится при следующем обновлении списка подписчиков (несколько раз в день). Ищи ник без «@»</li>
+      <li>Хочешь дом побольше — напиши коммент под рилсом и попроси флаг, лодку или цвет крыши 🚩</li>
     </ol>
     <a class="btn yellow full" href="https://www.instagram.com/ostrov.podpischikov/" target="_blank" rel="noopener">Открыть Instagram</a>
     <button class="btn dark full" id="lostClose">Понятно</button>
@@ -343,7 +344,7 @@
         $("count").textContent = fmt(total);
         $("bizCount").textContent = fmt(residents.filter((r) => r.biz).length);
         if (plots) $("emptyInfo").textContent = `🚧 Участков подписчиков без дома: ${fmt(plots)} — напиши коммент, и дом вырастет`;
-        else if (emptyPlots) $("emptyInfo").textContent = `🚧 Пустых участков: ${fmt(emptyPlots)} — займи свой комментом`;
+        else if (emptyPlots) $("emptyInfo").textContent = `🚧 Пустых участков: ${fmt(emptyPlots)} — подпишись, и один станет твоим`;
         $("day").textContent = dayOf(new Date().toISOString());
         const g = GOALS.find((x) => x.n > total) || GOALS[GOALS.length - 1], goal = g.n;
         $("goal").textContent = `До ${fmt(goal)}: ещё ${fmt(Math.max(0, goal - total))} · ${g.emoji} ${g.title}`;
@@ -497,7 +498,7 @@
         selected = null;
         marker.visible = false;
         sheet.innerHTML = `<div class="top"><div class="nick">@${esc(nick)}</div><button class="x" data-close>×</button></div>
-          <p>Тебя пока нет на острове 🏝 ${emptyPlots ? `Для подписчиков уже размечено ${fmt(emptyPlots)} пустых участков — ` : ""}подпишись на @${IG} и напиши любой коммент под последним рилсом: через 15 минут на участке вырастет твой шалаш.</p>
+          <p>Тебя пока нет на острове 🏝 ${emptyPlots ? `Для подписчиков уже размечено ${fmt(emptyPlots)} пустых участков — ` : ""}подпишись на @${IG} — и на острове вырастет твой дом (список подписчиков обновляем несколько раз в день). Коммент под рилсом — +1 уровень.</p>
           <a class="btn yellow full" href="https://www.instagram.com/${IG}/" target="_blank" rel="noopener">Открыть Instagram</a>`;
         return;
       }
