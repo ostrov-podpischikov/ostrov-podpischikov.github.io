@@ -8,6 +8,16 @@
     "follower_points": 3,
     "options": [
       {
+        "key": "kz",
+        "label": "Казахстан",
+        "emoji": "🇰🇿",
+        "words": [
+          "казах",
+          "kazakh",
+          "кз"
+        ]
+      },
+      {
         "key": "kg",
         "label": "Кыргызстан",
         "emoji": "🇰🇬",
@@ -17,16 +27,6 @@
           "кыргзс",
           "kyrgyz",
           "кр"
-        ]
-      },
-      {
-        "key": "kz",
-        "label": "Казахстан",
-        "emoji": "🇰🇿",
-        "words": [
-          "казах",
-          "kazakh",
-          "кз"
         ]
       },
       {
