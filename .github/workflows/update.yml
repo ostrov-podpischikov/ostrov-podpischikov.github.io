@@ -37,6 +37,19 @@ jobs:
           python tools/dm_follow.py || echo "Личные сообщения пропущены"
           python tools/build_map.py
 
+      - name: Сохранить карту сразу (до автоответов)
+        run: |
+          git config user.name "ostrov-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/residents.json data/residents.json data/polls.json
+          if git diff --cached --quiet; then
+            echo "Карта без изменений"
+          else
+            git commit -m "Жители острова: карта"
+            git pull --rebase --autostash
+            git push
+          fi
+
       - name: Автоответы на комментарии (включаются переменной AUTO_REPLY=on)
         # a slow reply run must not block saving the map
         timeout-minutes: 8
@@ -48,7 +61,7 @@ jobs:
         run: python tools/auto_reply.py
 
       - name: Сохранить, если что-то изменилось
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         run: |
           git config user.name "ostrov-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
