@@ -17,13 +17,21 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # comments from earlier runs (private Actions cache, not the public repo): only new comments are fetched
+      - name: Кэш комментов
+        uses: actions/cache/restore@v4
+        with:
+          path: tools/comments.json
+          key: comments-${{ github.run_id }}
+          restore-keys: comments-
 
       - name: Собрать жителей из комментов
         env:
@@ -36,6 +44,12 @@ jobs:
           python tools/fetch_comments.py
           python tools/dm_follow.py || echo "Личные сообщения пропущены"
           python tools/build_map.py
+
+      - name: Сохранить кэш комментов
+        uses: actions/cache/save@v4
+        with:
+          path: tools/comments.json
+          key: comments-${{ github.run_id }}
 
       - name: Сохранить карту сразу (до автоответов)
         run: |
