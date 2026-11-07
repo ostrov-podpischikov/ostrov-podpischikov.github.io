@@ -155,6 +155,8 @@ def tally_polls():
             hit = next((o["key"] for o in p["options"] if o["key"] in numbers), None)
             hit = hit or next((o["key"] for o in p["options"]
                                if any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words)), None)
+            # a flag emoji (🇰🇬) counts as the option whose emoji it is
+            hit = hit or (next((o["key"] for o in p["options"] if p.get("each") and o.get("emoji") and o["emoji"] in c.get("text", "")), None))
             if hit and c.get("username"):
                 votes[c.get("id") or (c["username"], c["time"]) if p.get("each") else c["username"]] = hit
         counts = {o["key"]: 0 for o in p["options"]}
