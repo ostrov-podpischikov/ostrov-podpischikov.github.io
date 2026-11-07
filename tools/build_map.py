@@ -143,6 +143,10 @@ def tally_polls():
     polls = json.loads(cfg_file.read_text(encoding="utf-8"))
     comments = json.loads(com_file.read_text(encoding="utf-8")) if com_file.exists() else []
     comments.sort(key=lambda c: c["time"])
+    # "follower_points": N — a comment from a follower (in followers.json) counts N, anyone else 1
+    fol_file = HERE / "followers.json"
+    fol_h = set(json.loads(fol_file.read_text(encoding="utf-8")).get("h", [])) if fol_file.exists() else set()
+    is_fol = lambda nick: hashlib.sha1(nick.lower().encode()).hexdigest()[:12] in fol_h
     out = []
     for p in polls:
         votes = {}
@@ -162,11 +166,12 @@ def tally_polls():
             # a flag emoji (🇰🇬) counts as the option whose emoji it is
             hit = hit or (next((o["key"] for o in p["options"] if p.get("each") and o.get("emoji") and o["emoji"] in c.get("text", "")), None))
             if hit and c.get("username"):
-                votes[c.get("id") or (c["username"], c["time"]) if p.get("each") else c["username"]] = hit
+                w = p.get("follower_points", 1) if is_fol(c["username"]) else 1
+                votes[c.get("id") or (c["username"], c["time"]) if p.get("each") else c["username"]] = (hit, w)
         counts = {o["key"]: 0 for o in p["options"]}
-        for k in votes.values():
-            counts[k] += 1
-        out.append({"id": p["id"], "question": p["question"], "how": p.get("how", ""), "total": len(votes),
+        for k, w in votes.values():
+            counts[k] += w
+        out.append({"id": p["id"], "question": p["question"], "how": p.get("how", ""), "total": sum(counts.values()),
                     "options": [{"key": o["key"], "label": o["label"], "emoji": o.get("emoji", ""), "votes": counts[o["key"]]}
                                 for o in p["options"]]})
     return out
