@@ -842,8 +842,63 @@
     const lighthouse = buildLighthouse(THREE, new THREE.Vector3(2.5, 0, pz + 14));
     group.add(lighthouse.group);
 
+    // the port (goal 1000, day 6): a stone quay east of the pier with cranes, containers, a cargo ship and a warehouse
+    let port = null;
+    const housesCount = rows.filter((r) => !r.plot).length;
+    if (opts.port || (opts.port !== false && housesCount >= 999)) {
+      const at = new THREE.Vector3(10, 0, pz + 2);
+      const pb = new Builder(THREE);
+      buildPort(pb, at.x, at.z);
+      group.add(pb.mesh());
+      port = { pos: at.clone().add(new THREE.Vector3(22, 2, 6)) };
+    }
+
     const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
-    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse };
+    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port };
+  }
+
+  // the port, in boxes; (x, z) is its south-west land corner, the quay reaches out into the sea along +z
+  function buildPort(b, x, z) {
+    const Y = "#F4C430", Y2 = "#D9A920", ST = "#8A8F96", ST2 = "#9EA3AA";
+    // the quay: a long stone platform, a darker edge stripe and bollards
+    b.box(x + 22, 0.8, z + 5, 46, 1.6, 12, ST2, ST);
+    b.box(x + 22, 1.62, z + 10.6, 46, 0.06, 0.6, "#F4D35E");
+    for (let k = 0; k < 12; k++) b.box(x + 1 + k * 4, 1.85, z + 10.8, 0.35, 0.5, 0.35, "#2B2D42");
+    // three finger piers on posts
+    [6, 24, 40].forEach((px) => {
+      b.box(x + px, 1.3, z + 17, 3, 0.25, 12, C.plank, C.plank2);
+      for (let k = 0; k < 4; k++) b.box(x + px - 1.3, 0.6, z + 12 + k * 3.4, 0.3, 1.2, 0.3, C.log2).box(x + px + 1.3, 0.6, z + 12 + k * 3.4, 0.3, 1.2, 0.3, C.log2);
+    });
+    // two gantry cranes: legs, a tower, a boom over the water and a counterweight
+    [12, 30].forEach((cx) => {
+      [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]].forEach(([a, c]) => b.box(x + cx + a, 3.6, z + 7 + c, 0.4, 4, 0.4, Y, Y2));
+      b.box(x + cx, 5.8, z + 7, 3.8, 0.5, 3.8, Y, Y2);
+      b.box(x + cx, 8.2, z + 7, 1.2, 4.4, 1.2, Y, Y2);
+      b.box(x + cx, 10.6, z + 11, 1.0, 0.8, 16, Y, Y2);
+      b.box(x + cx, 10.4, z + 1.5, 2.2, 1.6, 2.4, "#4A4F57");
+      b.box(x + cx, 9.4, z + 6.5, 1.6, 1.4, 1.6, "#2B2F36");                      // cab
+      b.box(x + cx, 9.4, z + 7.32, 1.2, 0.7, 0.02, C.glass);
+      b.box(x + cx, 8.0, z + 17, 0.08, 5, 0.08, "#333333").box(x + cx, 5.3, z + 17, 0.8, 0.4, 0.8, "#333333"); // hook
+    });
+    // stacks of containers on the quay
+    const CON = ["#E2483D", "#2E86AB", "#3FA34D", "#F08A24", "#8E5BD9", "#F4D35E"];
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) for (let h = 0; h < 1 + ((i * 3 + j) % 3); h++) {
+      const col = CON[(i * 5 + j * 3 + h) % CON.length];
+      b.box(x + 16 + i * 2.7 - (i > 2 ? -6 : 0), 2.3 + h * 1.3, z + 1.5 + j * 1.5, 2.5, 1.2, 1.3, col);
+    }
+    // the cargo ship moored along the quay: red underside, navy hull, containers on deck, a white bridge at the stern
+    b.box(x + 21, 0.6, z + 14.5, 18, 1.2, 5, "#C8473D");
+    b.box(x + 21, 1.9, z + 14.5, 18.4, 1.4, 5.2, "#0B3954");
+    b.box(x + 30.8, 2.2, z + 14.5, 1.6, 1.6, 3.4, "#0B3954");                     // bow
+    for (let i = 0; i < 5; i++) for (let h = 0; h < 2; h++) b.box(x + 15 + i * 2.6, 3.2 + h * 1.2, z + 14.5, 2.4, 1.1, 4, CON[(i * 2 + h) % CON.length]);
+    b.box(x + 13.2, 4.2, z + 14.5, 2.6, 3.2, 4, "#FFFFFF");
+    b.box(x + 13.2, 5.2, z + 16.52, 2.0, 0.6, 0.02, C.glass).box(x + 13.2, 6.3, z + 14.5, 0.6, 1.2, 0.6, "#E2483D");
+    // the warehouse with a striped roof and big doors
+    b.box(x + 4, 3.6, z + 3, 7, 4, 6, "#C9A27A", "#B08A62");
+    b.box(x + 4, 5.8, z + 3, 7.4, 0.4, 6.4, "#E2483D");
+    b.box(x + 4, 3.0, z + 6.02, 3, 2.8, 0.04, "#6E4123");
+    // a little tug boat by the first pier
+    b.box(x + 9.5, 0.5, z + 19, 2, 0.9, 3.6, "#F08A24").box(x + 9.5, 1.5, z + 18.5, 1.4, 1.1, 1.6, "#FFFFFF").box(x + 9.5, 2.4, z + 18.2, 0.4, 0.8, 0.4, "#2B2D42");
   }
 
   function buildLighthouse(THREE, at) {
