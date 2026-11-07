@@ -50,6 +50,10 @@ jobs:
             git push
           fi
 
+      - name: Какие страны просят (только счёт, без ников)
+        continue-on-error: true
+        run: python tools/country_scan.py
+
       - name: Автоответы на комментарии (включаются переменной AUTO_REPLY=on)
         # a slow reply run must not block saving the map
         timeout-minutes: 8
