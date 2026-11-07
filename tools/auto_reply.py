@@ -223,6 +223,12 @@ def main():
     budget = min(MAX_PER_RUN, MAX_PER_HOUR - sum(t > hour_ago for t in st["sent"]), MAX_PER_DAY - len(st["sent"]))
     todo = queue[:max(0, budget)]
 
+    def save():
+        st["done"] = st["done"][-5000:]
+        tmp = state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(st, ensure_ascii=False, indent=0), encoding="utf-8")
+        tmp.replace(state_file)
+
     sent = 0
     for k, (c, covered) in enumerate(todo):
         nick = c["username"]
@@ -249,16 +255,14 @@ def main():
             st["nicks"][nick] = stamp
             st["sent"].append(stamp)
             st["done"] += [c["id"]] + covered
+            save()  # after every reply: if the step is cut off by its timeout, nobody gets answered twice
         elif blocked:
             st["pause_until"] = iso(now + timedelta(hours=PAUSE_HOURS))
             print(f"⏸ Instagram ограничил ответы — пауза до {st['pause_until']} UTC")
             break
 
     if not args.dry_run:
-        st["done"] = st["done"][-5000:]
-        tmp = state_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(st, ensure_ascii=False, indent=0), encoding="utf-8")
-        tmp.replace(state_file)
+        save()
     print(f"Автоответы: {'показано' if args.dry_run else 'отправлено'} {len(todo) if args.dry_run else sent} "
           f"(в очереди всего {len(queue)}, лимит этого запуска {max(0, budget)})")
 
