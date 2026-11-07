@@ -134,6 +134,9 @@ def write_atomic(path, text):
     tmp.replace(path)
 
 
+LOCAL_LETTERS = str.maketrans({"қ": "к", "ғ": "г", "ү": "у", "ұ": "у", "ө": "о", "ң": "н", "ә": "а", "і": "и", "һ": "х", "ў": "у", "ҳ": "х", "ʻ": "", "'": "", "’": ""})
+
+
 def tally_polls():
     """Votes from comments: an option number as a standalone number, or a word from the option.
     One vote per person — their latest comment that votes for something; a poll with "each": true counts every comment."""
@@ -157,7 +160,8 @@ def tally_polls():
             until = p.get("until", "")   # the vote closes: later comments don't count
             if until and c["time"][:len(until)] >= until:
                 continue
-            text = c.get("text", "").lower().replace("ё", "е")
+            # Kazakh/Kyrgyz/Uzbek letters folded to Russian ones: «Қазақстан» used to split into pieces and never count
+            text = c.get("text", "").lower().replace("ё", "е").translate(LOCAL_LETTERS)
             words = re.findall(r"[a-zа-я]+", text)
             numbers = set(re.findall(r"(?<!\d)\d(?!\d)", text))
             hit = next((o["key"] for o in p["options"] if o["key"] in numbers), None)
