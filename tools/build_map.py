@@ -241,7 +241,14 @@ def main():
         # plot numbers in joining order, so the island has no holes
         for k, r in enumerate(sorted(residents.values(), key=lambda r: r["no"])):
             r["no"] = k + 2
-        print(f"Подписчики: на острове {len(residents)} из {before} (снимок {at[:16]})")
+        houses = len(residents)
+        # followers who haven't commented yet get a staked-out plot with their nick (these nicks are public followers)
+        taken, nxt = {n.lower() for n in residents}, houses + 2
+        for n in fol.get("plots", []):
+            if n.lower() not in taken:
+                residents[n] = {"no": nxt, "nick": n, "level": 1, "since": at[:10], "plot": True}
+                nxt += 1
+        print(f"Подписчики: домов {houses} из {before} комментаторов, участков {len(residents) - houses} (снимок {at[:16]})")
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
