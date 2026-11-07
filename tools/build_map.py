@@ -237,7 +237,7 @@ def main():
         joined = {r["nick"]: r.get("since", "") for r in rows}
         before = len(residents)
         residents = {n: r for n, r in residents.items()
-                     if hashlib.sha1(n.lower().encode()).hexdigest()[:12] in hs or joined.get(n, "9999") > at}
+                     if hashlib.sha1(n.lower().encode()).hexdigest()[:12] in hs}
         # plot numbers in joining order, so the island has no holes
         for k, r in enumerate(sorted(residents.values(), key=lambda r: r["no"])):
             r["no"] = k + 2
