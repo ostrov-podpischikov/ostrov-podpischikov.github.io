@@ -157,6 +157,9 @@ def tally_polls():
             since = p.get("since", "")   # a date, or a UTC time like 2026-11-06T18:40
             if c["time"][:len(since)] < since:
                 continue
+            reel_since = p.get("reel_since", "")   # only comments under reels posted from this time on
+            if reel_since and c.get("reel_time", "")[:len(reel_since)] < reel_since:
+                continue
             until = p.get("until", "")   # the vote closes: later comments don't count
             if until and c["time"][:len(until)] >= until:
                 continue
