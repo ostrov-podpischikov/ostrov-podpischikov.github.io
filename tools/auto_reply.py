@@ -186,6 +186,11 @@ def main():
 
     comments = json.loads((HERE / "comments.json").read_text(encoding="utf-8"))
     residents = {r["nick"]: r for r in json.loads((HERE / "residents.json").read_text(encoding="utf-8"))}
+    # the map renumbers plots (only followers live there): quote the number people will find on the site
+    site = HERE.parent / "data" / "residents.json"
+    if site.exists():
+        on_map = {r["nick"]: r["no"] for r in json.loads(site.read_text(encoding="utf-8")).get("residents", [])}
+        residents = {n: (dict(r, no=on_map[n]) if n in on_map else r) for n, r in residents.items()}
     polls_file = HERE / "polls.json"
     polls = json.loads(polls_file.read_text(encoding="utf-8")) if polls_file.exists() else []
 
