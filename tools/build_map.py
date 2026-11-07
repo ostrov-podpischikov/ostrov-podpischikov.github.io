@@ -12,6 +12,7 @@
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -225,6 +226,22 @@ def main():
     for nick, yes in follows.items():
         if nick in residents and yes is False:
             residents[nick]["follows"] = False
+
+    # only followers live on the island. followers.json is a snapshot of the follower list, taken in the browser:
+    # {"at": UTC time, "h": [first 12 hex of sha1(nick)]} — hashes, so the public repo doesn't list anyone.
+    # People who commented after the snapshot stay until the next snapshot can check them.
+    fol_file = HERE / "followers.json"
+    if fol_file.exists():
+        fol = json.loads(fol_file.read_text(encoding="utf-8"))
+        hs, at = set(fol.get("h", [])), fol.get("at", "")
+        joined = {r["nick"]: r.get("since", "") for r in rows}
+        before = len(residents)
+        residents = {n: r for n, r in residents.items()
+                     if hashlib.sha1(n.lower().encode()).hexdigest()[:12] in hs or joined.get(n, "9999") > at}
+        # plot numbers in joining order, so the island has no holes
+        for k, r in enumerate(sorted(residents.values(), key=lambda r: r["no"])):
+            r["no"] = k + 2
+        print(f"Подписчики: на острове {len(residents)} из {before} (снимок {at[:16]})")
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
