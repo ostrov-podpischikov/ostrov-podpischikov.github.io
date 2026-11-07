@@ -150,6 +150,9 @@ def tally_polls():
             since = p.get("since", "")   # a date, or a UTC time like 2026-11-06T18:40
             if c["time"][:len(since)] < since:
                 continue
+            until = p.get("until", "")   # the vote closes: later comments don't count
+            if until and c["time"][:len(until)] >= until:
+                continue
             text = c.get("text", "").lower().replace("ё", "е")
             words = re.findall(r"[a-zа-я]+", text)
             numbers = set(re.findall(r"(?<!\d)\d(?!\d)", text))
