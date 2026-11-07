@@ -46,7 +46,7 @@ jobs:
             echo "Карта без изменений"
           else
             git commit -m "Жители острова: карта"
-            git pull --rebase --autostash
+            git pull --rebase --autostash -X theirs   # generated files: this run's fresh copy wins
             git push
           fi
 
@@ -75,6 +75,6 @@ jobs:
             echo "Без изменений"
           else
             git commit -m "Жители острова: обновление"
-            git pull --rebase --autostash
+            git pull --rebase --autostash -X theirs   # generated files: this run's fresh copy wins
             git push
           fi
