@@ -52,6 +52,7 @@
     .suggest small { color: var(--muted); font-weight: 600; font-size: 12px; }
 
     .stats { padding: 10px 14px 12px; }
+    @media (orientation: portrait) { body.card .stats { display: none; } }
     .stats .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
     .stats .row b { color: var(--accent); font-weight: 900; }
     .stats .row .dot { color: var(--muted); margin: 0 6px; }
@@ -494,6 +495,7 @@
       $("polls").style.display = "none";
       const h = island && island.houses.get(nick);
       sheet.style.display = "block";
+      document.body.classList.toggle("card", !!h);
       if (!h) {
         selected = null;
         marker.visible = false;
@@ -507,11 +509,6 @@
       marker.visible = true;
       marker.userData.y = h.top.y + 2.2;
       marker.position.set(h.top.x, marker.userData.y, h.top.z);
-      // frame the whole house: the camera backs off with the house height; on a phone the card covers the lower half,
-      // so the camera looks at a point under the house and the house rises into the free band above the card
-      const hh = Math.max(4, h.top.y - h.pos.y), tall = innerWidth < innerHeight;
-      const dist = (tall ? 2.6 : 1.9) * hh + 8;
-      flyTo(h.pos.clone().add(new THREE.Vector3(0, tall ? -hh * 0.55 : hh * 0.35, 0)), front(h, dist, dist * 0.7, dist * 0.25));
       const lv = OstrovIsland.LEVELS[h.level - 1];
       const r = residents.find((x) => x.nick === nick) || {};
       const day = dayOf(r.since);
@@ -536,10 +533,31 @@
       $("lvlUp").onclick = () => openDrawer("quests");
       $("share").onclick = () => shareLink(h);
       $("pass").onclick = () => openPassport(h, district(h.ring || 0), day);
+      frameHouse(h);
+    }
+    // frame the house in the free band between the top panels and the card (measured after the card is rendered):
+    // the camera backs off when the band is narrow, then pans down so the house sits in the middle of the band
+    function frameHouse(h) {
+      const hh = Math.max(4, h.top.y - h.pos.y), H = innerHeight;
+      let topY = 0;
+      document.querySelectorAll(".panel").forEach((p) => {
+        const r = p.getBoundingClientRect();
+        if (r.height && r.bottom < H * 0.5 && !p.closest("#sheet")) topY = Math.max(topY, r.bottom);
+      });
+      const botY = Math.min(H, sheet.getBoundingClientRect().top || H);
+      const band = Math.max(0.15, (botY - topY - 16) / H);
+      const dist = ((innerWidth < H ? 2.6 : 1.9) * hh + 8) * Math.min(2.2, Math.max(1, 0.6 / band));
+      const target = h.pos.clone().add(new THREE.Vector3(0, hh * 0.5, 0));
+      const pos = front(h, dist, dist * 0.7, dist * 0.25).add(new THREE.Vector3(0, hh * 0.5, 0));
+      const fwd = target.clone().sub(pos).normalize();
+      const up = new THREE.Vector3().crossVectors(new THREE.Vector3().crossVectors(fwd, camera.up).normalize(), fwd);
+      const shift = ((H / 2 - (topY + botY) / 2) / (H / 2)) * pos.distanceTo(target) * Math.tan((camera.fov * Math.PI) / 360);
+      up.multiplyScalar(-shift);
+      flyTo(target.add(up), pos.add(up));
     }
     sheet.addEventListener("click", (e) => {
       if (!e.target.closest("[data-close]")) return;
-      sheet.style.display = "none"; selected = null; marker.visible = false; history.replaceState(null, "", location.pathname);
+      sheet.style.display = "none"; document.body.classList.remove("card"); selected = null; marker.visible = false; history.replaceState(null, "", location.pathname);
     });
     window.addEventListener("hashchange", () => {
       const n = norm(decodeURIComponent(location.hash.slice(1)));
@@ -556,7 +574,7 @@
     // ── drawers: tours and growth (one open at a time, the resident sheet closes)
     function openDrawer(id) {
       ["tours", "growth", "polls", "goals", "quests"].forEach((d) => ($(d).style.display = d === id ? "block" : "none"));
-      sheet.style.display = "none";
+      sheet.style.display = "none"; document.body.classList.remove("card");
     }
 
     // ── polls: votes are comments under the reels, counted every 15 minutes
