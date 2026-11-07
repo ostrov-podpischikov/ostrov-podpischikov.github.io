@@ -918,6 +918,20 @@
     [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]].forEach(([a, c]) => box(a, y + 0.9, c, 0.15, 1.0, 0.15, "#2B2F36"));
     box(0, y + 1.4, 0, 1.9, 1.8, 1.9, "#FFE27A", true);
     box(0, y + 2.6, 0, 2.4, 0.6, 2.4, "#D9433B"); box(0, y + 3.2, 0, 1.2, 0.6, 1.2, "#D9433B");
+    // the flag over the lighthouse: Kazakhstan, the island's decision after the flag vote (7 Nov 2026)
+    box(0, y + 3.5 + 2.2, 0, 0.14, 4.4, 0.14, "#D8DDE3");
+    const fc = document.createElement("canvas"); fc.width = 300; fc.height = 200;
+    const f = fc.getContext("2d");
+    f.fillStyle = "#00AFCA"; f.fillRect(0, 0, 300, 200);
+    f.fillStyle = "#FEC50C"; f.fillRect(14, 10, 14, 180);
+    f.beginPath(); f.arc(165, 85, 32, 0, Math.PI * 2); f.fill();
+    f.strokeStyle = "#FEC50C"; f.lineWidth = 5;
+    for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; f.beginPath(); f.moveTo(165 + Math.cos(a) * 38, 85 + Math.sin(a) * 38); f.lineTo(165 + Math.cos(a) * 52, 85 + Math.sin(a) * 52); f.stroke(); }
+    f.beginPath(); f.moveTo(105, 150); f.quadraticCurveTo(165, 120, 225, 150); f.quadraticCurveTo(165, 135, 105, 150); f.fill();
+    const fg = new THREE.PlaneGeometry(3.3, 2.2); fg.translate(1.72, 0, 0);
+    const flag = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc), side: THREE.DoubleSide }));
+    flag.position.set(0.08, y + 3.5 + 3.3, 0);
+    g.add(flag);
     const beam = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({ color: "#FFF3B0", transparent: true, opacity: 0.22, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
     [1, -1].forEach((s) => {
