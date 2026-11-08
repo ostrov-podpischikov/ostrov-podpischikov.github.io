@@ -350,7 +350,7 @@
         kzIsle.houses.forEach((h, n) => { h.pos.add(at); h.top.add(at); island.houses.set(n, h); });
       }
     }
-    fetch("data/residents.json?v=" + Math.floor(Date.now() / 60000))
+    fetch("data/residents.json?v=" + Math.floor(Date.now() / 600000))
       .then((r) => r.json())
       .then((data) => {
         residents = data.residents || data;
@@ -622,7 +622,7 @@
 
     // ── polls: votes are comments under the reels, counted every 15 minutes
     let polls = [];
-    fetch("data/polls.json?v=" + Math.floor(Date.now() / 60000)).then((r) => (r.ok ? r.json() : [])).then((p) => {
+    fetch("data/polls.json?v=" + Math.floor(Date.now() / 600000)).then((r) => (r.ok ? r.json() : [])).then((p) => {
       polls = p || [];
     }).catch(() => {});
     function renderPolls() {
