@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=13"></script>
+  <script src="island.js?v=14"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -325,15 +325,30 @@
     const district = (ring) => DISTRICTS.find((d) => ring <= d[0])[1];
 
     // ── data and island
-    let island, residents = [], emptyPlots = 0;
+    let island, residents = [], emptyPlots = 0, kzIsle = null;
     function showIsland(list) {
-      if (island) {
-        scene.remove(island.group);
-        island.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-      }
+      [island, kzIsle].forEach((x) => {
+        if (!x) return;
+        scene.remove(x.group);
+        x.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      });
+      kzIsle = null;
+      // followers who voted «Казахстан» live on the Kazakh island (field c); each island numbers its own plots, the card keeps the real №
+      const local = (rows) => rows.map((r, k) => ({ ...r, gno: r.no, no: k + 2 }));
+      const home = list.filter((r) => !r.c), kz = list.filter((r) => r.c === "kz");
       // empty plots for followers without a comment, only on today's full island
-      island = OstrovIsland.build(THREE, list, { emptyPlots: list === residents ? emptyPlots : 0 });
+      island = OstrovIsland.build(THREE, local(home), { emptyPlots: list === residents ? emptyPlots : 0 });
       scene.add(island.group);
+      if (kz.length) {
+        kzIsle = OstrovIsland.build(THREE, local(kz), { country: "kz" });
+        // beside the main island, towards the start camera so it shows on the first screen
+        const d = island.radius + kzIsle.radius + 22, at = new THREE.Vector3(d * 0.94, 0, d * 0.34);
+        kzIsle.group.position.copy(at);
+        kzIsle.at = at;
+        scene.add(kzIsle.group);
+        // one map of houses for search, labels and cards, in world coordinates
+        kzIsle.houses.forEach((h, n) => { h.pos.add(at); h.top.add(at); island.houses.set(n, h); });
+      }
     }
     fetch("data/residents.json?v=" + Math.floor(Date.now() / 60000))
       .then((r) => r.json())
@@ -461,9 +476,22 @@
       const near = Math.min(12, Math.max(0.5, camera.position.distanceTo(controls.target) / 30));
       if (Math.abs(near - camera.near) > 0.05) { camera.near = near; camera.updateProjectionMatrix(); }
       // keep the view over the island: dragging can't carry it out to the open ocean
-      const lim = island ? island.radius * 1.1 : 0, t = controls.target, d = Math.hypot(t.x, t.z);
-      if (lim && d > lim) { panOffset.set(t.x, 0, t.z).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
+      // with a country island the view may also sit over it, or over the strait between the two
+      const t = controls.target;
+      let cx = 0, cz = 0, lim = island ? island.radius * 1.1 : 0;
+      if (kzIsle) {
+        const a = kzIsle.at, len = a.length(), u = Math.max(0, Math.min(1, (t.x * a.x + t.z * a.z) / (len * len)));
+        cx = a.x * u; cz = a.z * u;   // nearest point on the line between the two centres
+        lim = (island.radius + (kzIsle.radius - island.radius) * u) * 1.1;
+      }
+      const dx = t.x - cx, dz = t.z - cz, d = Math.hypot(dx, dz);
+      if (lim && d > lim) { panOffset.set(dx, 0, dz).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
       if (island && island.lighthouse) island.lighthouse.beam.rotation.y = now / 1600;
+      if (kzIsle && kzIsle.flagPole) {
+        const f = kzIsle.flagPole.flag, p = f.geometry.attributes.position, b = f.userData.base;
+        for (let i = 0; i < p.count; i++) { const x = b[i * 3]; p.array[i * 3 + 2] = Math.sin(x * 0.9 - now / 260) * 0.08 * x; }
+        p.needsUpdate = true;
+      }
       if (marker.visible) { marker.position.y = marker.userData.y + Math.sin(now / 250) * 0.4; marker.rotation.y = now / 600; }
       renderer.render(scene, camera);
       drawLabels();
@@ -529,7 +557,7 @@
       const day = dayOf(r.since);
       sheet.innerHTML = `<div class="top"><div><div class="nick">@${esc(h.nick)}</div><span class="badge">${h.plot ? "УЧАСТОК" : "ЖИТЕЛЬ"} №${h.no}</span></div><button class="x" data-close>×</button></div>
         <div class="fields">
-          <div><span>Район</span><span>${district(h.ring || 0)}</span></div>
+          <div><span>Район</span><span>${(h.isle === "kz" ? "🇰🇿 Остров Казахстана" : district(h.ring || 0))}</span></div>
           ${h.plot ? `<div><span>Дом</span><span>📍 пока участок</span></div>
           <div><span>Как построить</span><span>напиши любой коммент под рилсом — и тут вырастет дом</span></div>`
           : `<div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>`}
@@ -547,7 +575,7 @@
         <button class="btn dark full" id="lvlUp">⬆️ Прокачай дом — задания</button>`;
       $("lvlUp").onclick = () => openDrawer("quests");
       $("share").onclick = () => shareLink(h);
-      $("pass").onclick = () => openPassport(h, district(h.ring || 0), day);
+      $("pass").onclick = () => openPassport(h, (h.isle === "kz" ? "🇰🇿 Остров Казахстана" : district(h.ring || 0)), day);
       frameHouse(h);
     }
     // frame the house in the free band between the top panels and the card (measured after the card is rendered):
@@ -636,6 +664,7 @@
       if (top && top.level > 1) items.push([OstrovIsland.LEVELS[top.level - 1].emoji, "Лучший дом острова", "@" + top.nick + " · " + OstrovIsland.LEVELS[top.level - 1].name, () => find(top.nick)]);
       if (newest) items.push(["🏗", "Новые земли", "Здесь строятся самые свежие дома", () => find(newest.nick)]);
       if (island.empty && island.empty.length) items.push(["🚧", "Пустые участки", `${island.empty.length} мест ждут подписчиков без коммента`, () => { const e = island.empty[0]; flyTo(e.clone().add(V(0, 1, 0)), e.clone().add(V(10, 12, 14))); }]);
+      if (kzIsle) items.push(["🇰🇿", "Остров Казахстана", `Первый остров страны — ${fmt(kzIsle.houses.size)} подписчиков, голосовавших за Казахстан`, () => { const a = kzIsle.at, R = kzIsle.radius; flyTo(a.clone().add(V(0, 12, 0)), a.clone().add(V(R * 0.35, R * 0.55 + 16, R * 1.35))); }]);
       items.push(["🏝", "Весь остров", "Вид сверху", () => { const R = island.radius; flyTo(V(0, 2, 0), V(R * 0.9, R * 0.95 + 10, R * 1.25)); }]);
       const box = $("tourList");
       box.innerHTML = "";
