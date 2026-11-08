@@ -3,8 +3,10 @@
 
 1. Приглашение: на первый коммент жителя — одно личное сообщение (private reply) со ссылкой на дом
    и просьбой подписаться. Включается переменной DM_INVITE=on (DM_ONLY — только тестовые ники).
-2. Ответы: кто написал в директ — получает ссылку на свой дом; заодно узнаём, подписан ли он
-   (is_user_follow_business). Неподписанным — «подпишись, чтобы сохранить дом».
+2. Ответы: житель, впервые написавший в директ, получает ссылку на свой дом (один раз). Дальше бот
+   отвечает только на типовые вопросы (FAQ: сторис, нет дома, паспорт, ссылка, голосование) — каждую
+   тему не чаще раза в сутки; остальное молча оставляет человеку. Заодно узнаём, подписан ли житель
+   (is_user_follow_business). Неподписанным — «подпишись, и дом появится».
    Статус пишется в follows.json → build_map.py ставит на карте табличку «подпишись».
 
 Нужно разрешение instagram_manage_messages (Meta App Review). Пока его нет, сообщения работают
@@ -38,7 +40,26 @@ INVITE = "Привет! Твой дом №{no} на Острове подпис
 LINK = "Вот твой дом, житель №{no}: {url} 🏡"
 # not a follower yet: no house on the map, so no number either
 NO_HOUSE = "Дом на Острове подписчиков получают только подписчики 🏝\nПодпишись на @ostrov.podpischikov — и твой дом появится на карте: {url}"
-FOLLOW = "Чтобы дом остался за тобой — подпишись на @ostrov.podpischikov 🙏"
+# answers to common questions, by keywords in the person's last message (first match wins);
+# each topic goes to the same person at most once a day, anything else is left for a human to answer
+FAQ = [
+    ("story", ("истори", "сторис", "stories", "репост"),
+     "Конечно, можно! Выкладывай в историю и отметь @ostrov.podpischikov 🙌"),
+    ("nohouse", ("нет дома", "не наш", "нету", "не вижу", "не могу найти", "не появ", "не нахож"),
+     "Дом появляется у подписчиков после ночного обновления карты. Если подписался сегодня — завтра он будет на острове 🏡"),
+    ("passport", ("паспорт",), "Паспорт жителя — открой свой дом по ссылке, он там 🪪"),
+    ("link", ("ссылк", "мой дом", "номер", "где дом", "найти дом"), None),  # None → the personal link
+    ("vote", ("голос", "стран", "второй остров", "очк", "флаг"),
+     "Сейчас идёт гонка за второй остров 🏝 Пиши свою страну в комментах под последним рилсом: коммент = +1 очко, подписка = +3 ⭐"),
+]
+
+
+def faq_topic(text):
+    t = (text or "").lower().replace("ё", "е")
+    for topic, words, _ in FAQ:
+        if any(w.replace("ё", "е") in t for w in words):
+            return topic
+    return None
 
 
 def token():
@@ -100,6 +121,9 @@ def main():
     st = load(HERE / "dm.json", {})
     st.setdefault("invited", [])   # comment ids we sent a private reply to
     st.setdefault("answered", {})  # IGSID → time of the last message we answered
+    # IGSIDs that already got their house link (everyone answered before this existed did)
+    st.setdefault("linked", list(st["answered"].keys()))
+    st.setdefault("topics", {})    # IGSID → {topic: time we last sent it}
     # only messages that arrive after the first run get the automatic reply — old conversations are left alone
     st.setdefault("since", now.strftime("%Y-%m-%dT%H:%M:%S+0000"))
     follows = load(HERE / "follows.json", {})  # nick → true / false
@@ -146,7 +170,7 @@ def main():
             st["invited_nicks"].append(r["nick"])
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
-    convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(5){from,created_time}",
+    convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(5){from,created_time,message}",
                                                  "access_token": ptok})
     if err:
         print(f"Личные сообщения: переписки недоступны ({err})")
@@ -165,32 +189,51 @@ def main():
             if other in only and (sender.get("username") or "").lower() != other:
                 print(f"  тест @{other}: новейшее сообщение наше ({last.get('created_time')})")
             igsid, nick = sender.get("id"), (sender.get("username") or "").lower()
-            reason = ("нет отправителя" if not igsid else "последнее — наше" if igsid == IG_ID
-                      else "не житель" if nick not in residents else None)
+            reason = "нет отправителя" if not igsid else "последнее — наше" if igsid == IG_ID else None
             if nick in only:
                 print(f"  тест @{nick}: последнее сообщение {last.get('created_time')}, причина пропуска: {reason or 'нет'}")
             if reason:
                 skipped[reason] = skipped.get(reason, 0) + 1
                 continue
-            prof, err = call(igsid, {"fields": "username,is_user_follow_business", "access_token": ptok})
-            if prof and "is_user_follow_business" in prof:
-                follows[nick] = bool(prof["is_user_follow_business"])
-            if st["answered"].get(igsid, "") >= last.get("created_time", "") or last.get("created_time", "") < st["since"]:
+            resident = nick in residents
+            if resident:
+                prof, err = call(igsid, {"fields": "username,is_user_follow_business", "access_token": ptok})
+                if prof and "is_user_follow_business" in prof:
+                    follows[nick] = bool(prof["is_user_follow_business"])
+            created = last.get("created_time", "")
+            if st["answered"].get(igsid, "") >= created or created < st["since"]:
                 skipped["уже отвечено или старое"] = skipped.get("уже отвечено или старое", 0) + 1
                 continue  # already answered, or written before the replies were switched on
-            if nick in site_no and follows.get(nick) is not False:
-                text = LINK.format(no=site_no[nick], url=SITE + nick)
+            st["answered"][igsid] = created  # this message is handled, whatever we decide below
+            # what to answer: a known question, or the house link on a resident's very first message; else stay quiet
+            topic = faq_topic(last.get("message"))
+            if topic is None and resident and igsid not in st["linked"]:
+                topic = "link"
+            if topic == "link" and not resident:
+                topic = None
+            sent = st["topics"].setdefault(igsid, {})
+            if topic is None or sent.get(topic, "") > iso(now - timedelta(hours=24)):
+                why = "нет вопроса" if topic is None else "уже отвечали сегодня"
+                skipped[why] = skipped.get(why, 0) + 1
+                continue
+            if topic == "link":
+                if nick in site_no and follows.get(nick) is not False:
+                    text = LINK.format(no=site_no[nick], url=SITE + nick)
+                else:
+                    text = NO_HOUSE.format(url=SITE[:-1])
             else:
-                text = NO_HOUSE.format(url=SITE[:-1])
+                text = next(a for k, _, a in FAQ if k == topic)
             if args.dry_run:
-                print(f"  ответ @{nick}: {text}")
+                print(f"  ответ @{nick} [{topic}]: {text}")
                 continue
             _, err = call(f"{page}/messages", post={"recipient": json.dumps({"id": igsid}), "message": json.dumps({"text": text}),
                                                     "access_token": ptok})
             if err:
                 print(f"  ✗ ответ @{nick}: {err}")
                 continue
-            st["answered"][igsid] = last.get("created_time", iso(now))
+            sent[topic] = iso(now)
+            if topic == "link" and igsid not in st["linked"]:
+                st["linked"].append(igsid)
         print(f"  переписок: {len(convs.get('data', []))}, пропущено: {skipped or 0}")
 
     if not args.dry_run:
