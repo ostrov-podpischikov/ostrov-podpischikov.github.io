@@ -54,6 +54,12 @@ FAQ = [
 ]
 
 
+def is_bot(text):
+    """Was this message written by this script (link, no-house note or a FAQ answer)?"""
+    t = text or ""
+    return t.startswith(("Вот твой дом", "Дом на Острове", "Привет! Твой дом")) or any(a and t == a for _, _, a in FAQ)
+
+
 def faq_topic(text):
     t = (text or "").lower().replace("ё", "е")
     for topic, words, _ in FAQ:
@@ -124,6 +130,9 @@ def main():
     # IGSIDs that already got their house link (everyone answered before this existed did)
     st.setdefault("linked", list(st["answered"].keys()))
     st.setdefault("topics", {})    # IGSID → {topic: time we last sent it}
+    if not st.get("faq_v"):
+        # the old bot answered every message with the link: look at those chats again so real questions get answers
+        st["answered"], st["faq_v"] = {}, 1
     # only messages that arrive after the first run get the automatic reply — old conversations are left alone
     st.setdefault("since", now.strftime("%Y-%m-%dT%H:%M:%S+0000"))
     follows = load(HERE / "follows.json", {})  # nick → true / false
@@ -170,8 +179,21 @@ def main():
             st["invited_nicks"].append(r["nick"])
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
-    convs, err = call(f"{page}/conversations", {"platform": "instagram", "fields": "participants,messages.limit(5){from,created_time,message}",
+    convs, err = call(f"{page}/conversations", {"platform": "instagram", "limit": 50,
+                                                 "fields": "participants,messages.limit(5){from,created_time,message}",
                                                  "access_token": ptok})
+    # all recent chats, not just the first page: older unanswered ones sit further down the list
+    nxt, pages = (convs or {}).get("paging", {}).get("next"), 1
+    while convs and nxt and pages < 10:
+        try:
+            with urllib.request.urlopen(nxt, timeout=30) as r:
+                more = json.loads(r.read())
+        except (urllib.error.URLError, ValueError):
+            break
+        convs["data"] += more.get("data", [])
+        nxt, pages = more.get("paging", {}).get("next"), pages + 1
+    # Meta lets a page answer only within 24 h of the person's last message
+    window = iso(now - timedelta(hours=23, minutes=30))
     if err:
         print(f"Личные сообщения: переписки недоступны ({err})")
     else:
@@ -181,7 +203,14 @@ def main():
         for conv in convs.get("data", []):
             # the API does not promise an order: take the newest of the last few messages
             msgs = (conv.get("messages") or {}).get("data") or [{}]
-            last = max(msgs, key=lambda m: m.get("created_time", ""))
+            ct = lambda m: m.get("created_time", "")
+            # the person's newest message; if only the bot spoke after it (the old link-only reply), it still needs an answer,
+            # but if a human answered from the account, leave the chat alone
+            theirs = [m for m in msgs if (m.get("from") or {}).get("id") not in (None, IG_ID)]
+            last = max(theirs, key=ct) if theirs else max(msgs, key=ct)
+            if any((m.get("from") or {}).get("id") == IG_ID and ct(m) > ct(last) and not is_bot(m.get("message")) for m in msgs):
+                skipped["ответил человек"] = skipped.get("ответил человек", 0) + 1
+                continue
             sender = last.get("from") or {}
             # the other side of the chat, even when our message is the newest (for the debug line)
             other = next(((p.get("username") or "").lower() for p in (conv.get("participants") or {}).get("data", [])
@@ -201,9 +230,9 @@ def main():
                 if prof and "is_user_follow_business" in prof:
                     follows[nick] = bool(prof["is_user_follow_business"])
             created = last.get("created_time", "")
-            if st["answered"].get(igsid, "") >= created or created < st["since"]:
-                skipped["уже отвечено или старое"] = skipped.get("уже отвечено или старое", 0) + 1
-                continue  # already answered, or written before the replies were switched on
+            if st["answered"].get(igsid, "") >= created or created[:19] < window:
+                skipped["уже отвечено или старше суток"] = skipped.get("уже отвечено или старше суток", 0) + 1
+                continue  # already answered, or out of Meta's 24-hour reply window
             st["answered"][igsid] = created  # this message is handled, whatever we decide below
             # what to answer: a known question, or the house link on a resident's very first message; else stay quiet
             topic = faq_topic(last.get("message"))
