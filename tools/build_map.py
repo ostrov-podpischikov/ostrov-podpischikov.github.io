@@ -184,6 +184,37 @@ def tally_polls():
     return out
 
 
+COUNTRY_ISLANDS = {"island": ["kz"]}   # poll id → countries that already have their own island
+
+
+def island_country():
+    """nick → country key: the person's latest vote in a poll that opened a country island (only countries that have one)."""
+    cfg_file, com_file = HERE / "polls.json", HERE / "comments.json"
+    if not cfg_file.exists() or not com_file.exists():
+        return {}
+    polls = {p["id"]: p for p in json.loads(cfg_file.read_text(encoding="utf-8"))}
+    out = {}
+    for pid, keys in COUNTRY_ISLANDS.items():
+        p = polls.get(pid)
+        if not p:
+            continue
+        since, reel_since, until = p.get("since", ""), p.get("reel_since", ""), p.get("until", "")
+        for c in sorted(json.loads(com_file.read_text(encoding="utf-8")), key=lambda c: c["time"]):
+            if c["time"][:len(since)] < since or (until and c["time"][:len(until)] >= until):
+                continue
+            if reel_since and c.get("reel_time", "")[:len(reel_since)] < reel_since:
+                continue
+            text = c.get("text", "").lower().replace("ё", "е").translate(LOCAL_LETTERS)
+            words = re.findall(r"[a-zа-я]+", text)
+            hit = next((o["key"] for o in p["options"]
+                        if any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words)
+                        or (o.get("emoji") and o["emoji"] in c.get("text", ""))), None)
+            if hit and c.get("username"):
+                out[c["username"]] = hit
+        out = {n: k for n, k in out.items() if k in keys}
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--demo", type=int, default=0)
@@ -264,6 +295,15 @@ def main():
                 residents[n] = {"no": nxt, "nick": n, "level": 1, "since": at[:10]}
                 nxt += 1
         print(f"Подписчики: домов {len(residents)} (с комментом {houses} из {before} комментаторов, без коммента {len(residents) - houses}; снимок {at[:16]})")
+
+    # country islands: followers who voted for a country that got its own island move there (field "c": "kz")
+    moved = 0
+    for nick, key in island_country().items():
+        if nick in residents and not residents[nick].get("plot"):
+            residents[nick]["c"] = key
+            moved += 1
+    if moved:
+        print(f"Острова стран: переехали {moved}")
 
     out = sorted(residents.values(), key=lambda r: r["no"])
     if args.demo:
