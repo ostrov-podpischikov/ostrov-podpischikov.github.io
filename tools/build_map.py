@@ -178,6 +178,9 @@ def tally_polls():
         counts = {o["key"]: 0 for o in p["options"]}
         for k, w in votes.values():
             counts[k] += w
+        # a closed vote keeps the result that was announced: later follower snapshots must not re-weight old comments
+        if p.get("result"):
+            counts = {o["key"]: int(p["result"].get(o["key"], 0)) for o in p["options"]}
         out.append({"id": p["id"], "question": p["question"], "how": p.get("how", ""), "total": sum(counts.values()),
                     "options": [{"key": o["key"], "label": o["label"], "emoji": o.get("emoji", ""), "votes": counts[o["key"]]}
                                 for o in p["options"]]})
