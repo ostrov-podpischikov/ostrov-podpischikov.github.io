@@ -389,7 +389,11 @@
         $("tIsle").style.display = kzIsle ? "" : "none";
         $("loading").remove();
         const fromLink = norm(new URLSearchParams(location.search).get("nick") || decodeURIComponent(location.hash.slice(1)));
-        if (fromLink) find(fromLink);
+        if (fromLink) {
+          find(fromLink);
+          // ?pp=1#nick (the DM bot's passport link): open the story passport right away
+          if (new URLSearchParams(location.search).get("pp")) setTimeout(() => $("pass") && $("pass").click(), 1800);
+        }
       })
       .catch((e) => {
         console.error(e);
