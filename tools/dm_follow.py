@@ -252,8 +252,6 @@ def main():
             topic = faq_topic(last.get("message"))
             if topic and topic != "link" and next(a for k, _, a in FAQ if k == topic) in ours:
                 topic = None  # this answer is already in the chat
-            if topic == "link" and igsid in st["linked"]:
-                topic = None  # the link is already in the chat; a repeat question gets no second copy
             if topic is None and resident and igsid not in st["linked"]:
                 topic = "link"
             if topic == "link" and not resident:
