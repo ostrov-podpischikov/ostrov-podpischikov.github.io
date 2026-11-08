@@ -42,14 +42,29 @@ LINK = "Вот твой дом, житель №{no}: {url} 🏡"
 NO_HOUSE = "Дом на Острове подписчиков получают только подписчики 🏝\nПодпишись на @ostrov.podpischikov — и твой дом появится на карте: {url}"
 # answers to common questions, by keywords in the person's last message (first match wins);
 # each topic goes to the same person at most once a day, anything else is left for a human to answer
+# Topics come from the real DMs (08.11: 208 messages): «где мой дом / добавьте меня / я подписан» is half of them,
+# then wishes for the house, passport, stories, Telegram, business. {house} / {pp} / {no} need a house on the map;
+# without one the person gets NOT_YET instead. Ads, complaints and anything unclear are left for a human.
+NOT_YET = ("Пока твоего дома на карте нет 🙈 Чтобы он появился:\n1) подпишись на @ostrov.podpischikov\n"
+           "2) напиши любой коммент под рилсом\nКарта обновляется каждую ночь — потом найди себя по нику: {site}")
 FAQ = [
+    ("passport", ("паспорт",),
+     "Твой паспорт жителя №{no} 🪪 {pp}\nОткрой ссылку, сохрани картинку и выложи в сторис с отметкой @ostrov.podpischikov — лучшие репостим 🔥"),
     ("story", ("истори", "сторис", "stories", "репост"),
-     "Конечно, можно! Выкладывай в историю и отметь @ostrov.podpischikov 🙌"),
-    ("nohouse", ("нет дома", "не наш", "нету", "не вижу", "не могу найти", "не появ", "не нахож"),
-     "Дом появляется у подписчиков после ночного обновления карты. Если подписался сегодня — завтра он будет на острове 🏡"),
-    ("passport", ("паспорт",), "Паспорт жителя — открой свой дом по ссылке, он там 🪪"),
-    ("link", ("ссылк", "мой дом", "номер", "где дом", "найти дом"), None),  # None → the personal link
-    ("vote", ("голос", "стран", "второй остров", "очк", "флаг"),
+     "Конечно! 🙌 Вот твой паспорт жителя для сторис: {pp}\nСохрани картинку, выложи и отметь @ostrov.podpischikov — репостнем 🔥"),
+    ("biz", ("бизнес", "кафе", "магазин", "шаурм", "ресторан"),
+     "Свой бизнес на острове 🏪 Напиши под рилсом коммент «хочу кафе» (или магазин, шаурму, пиццу, барбершоп) — и твой дом станет бизнесом"),
+    ("wish", ("бассейн", "этаж", "собак", "собач", "кот", "лошад", "лошадк", "лодк", "пальм", "замок", "замк", "вилл", "особняк",
+              "цвет", "голуб", "красн", "син", "черн", "розов", "дерев", "терас", "птич"),
+     "Желания исполняем из комментов 🚩 Напиши под последним рилсом, что хочешь у дома: собаку, кота, лошадь, лодку, пальму, флаг, "
+     "костёр или цвет дома (красный, синий, розовый…). А дом растёт до 7 уровня — задания на сайте: {house}"),
+    ("house", ("мой дом", "где я", "меня нет", "нету", "нет дома", "не вижу", "не могу найти", "не появ", "не нахож", "добав",
+               "хочу дом", "мне дом", "домик", "засел", "подписан", "подписал", "потпис", "патпис", "пописал", "хата",
+               "моя дома", "майдом", "мой где", "где мой", "ссылк", "номер", "найти", "мой ник", "меня на остров"),
+     "Ты уже на острове! 🏡 Твой дом №{no}: {house}"),
+    ("tg", ("телег", "telegram", "тг"),
+     "Наш Telegram: https://t.me/ostrovpodpischikov — голосования и новости острова 🗳"),
+    ("vote", ("голос", "стран", "второй остров", "очк", "флаг", "каракалп"),
      "Сейчас идёт гонка за второй остров 🏝 Пиши свою страну в комментах под последним рилсом: коммент = +1 очко, подписка = +3 ⭐"),
     # small talk last, so «привет, где мой дом?» still gets the real answer
     ("thanks", ("спасибо", "спс", "благодар", "рахмат", "рахмет", "сау бол"),
@@ -57,12 +72,21 @@ FAQ = [
     ("hello", ("привет", "салам", "здравств", "добрый", "хай", "hello", "hi "),
      "Привет! 👋 Это Остров подписчиков 🏝 Спрашивай: как найти дом, паспорт жителя, голосование за второй остров"),
 ]
+BOT_PREFIXES = ("Вот твой дом", "Дом на Острове", "Привет! Твой дом", NOT_YET[:30]) + tuple(a.split("{")[0][:30] for _, _, a in FAQ)
+
+
+def faq_answer(topic, nick, site_no):
+    """The text for a topic; personal answers fall back to NOT_YET when the person has no house on the map."""
+    a = next(a for k, _, a in FAQ if k == topic)
+    site = SITE[:-1]
+    if "{" in a and nick not in site_no:
+        return NOT_YET.format(site=site)
+    return a.format(no=site_no.get(nick, ""), house=SITE + nick, pp=f"{site}?pp=1#{nick}", site=site)
 
 
 def is_bot(text):
     """Was this message written by this script (link, no-house note or a FAQ answer)?"""
-    t = text or ""
-    return t.startswith(("Вот твой дом", "Дом на Острове", "Привет! Твой дом")) or any(a and t == a for _, _, a in FAQ)
+    return (text or "").startswith(BOT_PREFIXES)
 
 
 def faq_topic(text):
@@ -246,28 +270,24 @@ def main():
             st["answered"][igsid] = created  # this message is handled, whatever we decide below
             # the chat itself is the memory: whatever the bot already wrote here is never sent again
             ours = [m.get("message") or "" for m in msgs if (m.get("from") or {}).get("id") == IG_ID]
-            if any(t.startswith(("Вот твой дом", "Привет! Твой дом", "Дом на Острове")) for t in ours) and igsid not in st["linked"]:
+            if any(t.startswith(("Вот твой дом", "Привет! Твой дом", "Дом на Острове", "Ты уже на острове")) for t in ours) and igsid not in st["linked"]:
                 st["linked"].append(igsid)
             # what to answer: a known question, or the house link on a resident's very first message; else stay quiet
             topic = faq_topic(last.get("message"))
-            if topic and topic != "link" and next(a for k, _, a in FAQ if k == topic) in ours:
-                topic = None  # this answer is already in the chat
+            text = faq_answer(topic, nick, site_no) if topic else None
+            if text and text in ours:
+                topic = None  # exactly this answer is already in the chat
             if topic is None and resident and igsid not in st["linked"]:
                 topic = "link"
-            if topic == "link" and not resident:
-                topic = None
+                if nick in site_no and follows.get(nick) is not False:
+                    text = LINK.format(no=site_no[nick], url=SITE + nick)
+                else:
+                    text = NO_HOUSE.format(url=SITE[:-1])
             sent = st["topics"].setdefault(igsid, {})
             if topic is None or sent.get(topic, "") > iso(now - timedelta(hours=24)):
                 why = "нет вопроса" if topic is None else "уже отвечали сегодня"
                 skipped[why] = skipped.get(why, 0) + 1
                 continue
-            if topic == "link":
-                if nick in site_no and follows.get(nick) is not False:
-                    text = LINK.format(no=site_no[nick], url=SITE + nick)
-                else:
-                    text = NO_HOUSE.format(url=SITE[:-1])
-            else:
-                text = next(a for k, _, a in FAQ if k == topic)
             if args.dry_run:
                 print(f"  ответ @{nick} [{topic}]: {text}")
                 continue
@@ -277,7 +297,7 @@ def main():
                 print(f"  ✗ ответ @{nick}: {err}")
                 continue
             sent[topic] = iso(now)
-            if topic == "link" and igsid not in st["linked"]:
+            if topic in ("link", "house") and igsid not in st["linked"]:
                 st["linked"].append(igsid)
         print(f"  переписок: {len(convs.get('data', []))}, пропущено: {skipped or 0}")
 
