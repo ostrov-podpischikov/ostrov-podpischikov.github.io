@@ -179,12 +179,12 @@ def main():
             st["invited_nicks"].append(r["nick"])
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
-    convs, err = call(f"{page}/conversations", {"platform": "instagram", "limit": 50,
+    convs, err = call(f"{page}/conversations", {"platform": "instagram", "limit": 15,
                                                  "fields": "participants,messages.limit(5){from,created_time,message}",
                                                  "access_token": ptok})
     # all recent chats, not just the first page: older unanswered ones sit further down the list
     nxt, pages = (convs or {}).get("paging", {}).get("next"), 1
-    while convs and nxt and pages < 10:
+    while convs and nxt and pages < 20:
         try:
             with urllib.request.urlopen(nxt, timeout=30) as r:
                 more = json.loads(r.read())
