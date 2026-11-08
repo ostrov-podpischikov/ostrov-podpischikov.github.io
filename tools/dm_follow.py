@@ -51,6 +51,11 @@ FAQ = [
     ("link", ("ссылк", "мой дом", "номер", "где дом", "найти дом"), None),  # None → the personal link
     ("vote", ("голос", "стран", "второй остров", "очк", "флаг"),
      "Сейчас идёт гонка за второй остров 🏝 Пиши свою страну в комментах под последним рилсом: коммент = +1 очко, подписка = +3 ⭐"),
+    # small talk last, so «привет, где мой дом?» still gets the real answer
+    ("thanks", ("спасибо", "спс", "благодар", "рахмат", "рахмет", "сау бол"),
+     "Пожалуйста! 🙌 Рады, что ты с нами на острове 🏝"),
+    ("hello", ("привет", "салам", "здравств", "добрый", "хай", "hello", "hi "),
+     "Привет! 👋 Это Остров подписчиков 🏝 Спрашивай: как найти дом, паспорт жителя, голосование за второй остров"),
 ]
 
 
@@ -124,7 +129,12 @@ def main():
 
     now = datetime.now(timezone.utc)
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S")
-    st = load(HERE / "dm.json", {})
+    try:
+        st = json.loads((HERE / "dm.json").read_text(encoding="utf-8")) if (HERE / "dm.json").exists() else {}
+    except ValueError:
+        # never start from an empty memory by accident: that re-sends the link to everyone
+        print("Личные сообщения: dm.json повреждён — пропускаю, чтобы не писать людям повторно")
+        return
     st.setdefault("invited", [])   # comment ids we sent a private reply to
     st.setdefault("answered", {})  # IGSID → time of the last message we answered
     # IGSIDs that already got their house link (everyone answered before this existed did)
@@ -180,7 +190,7 @@ def main():
 
     # 2) replies: whoever wrote to us gets the link; their follow status goes to the map
     convs, err = call(f"{page}/conversations", {"platform": "instagram", "limit": 15,
-                                                 "fields": "participants,messages.limit(5){from,created_time,message}",
+                                                 "fields": "participants,messages.limit(10){from,created_time,message}",
                                                  "access_token": ptok})
     # all recent chats, not just the first page: older unanswered ones sit further down the list
     nxt, pages = (convs or {}).get("paging", {}).get("next"), 1
@@ -234,8 +244,16 @@ def main():
                 skipped["уже отвечено или старше суток"] = skipped.get("уже отвечено или старше суток", 0) + 1
                 continue  # already answered, or out of Meta's 24-hour reply window
             st["answered"][igsid] = created  # this message is handled, whatever we decide below
+            # the chat itself is the memory: whatever the bot already wrote here is never sent again
+            ours = [m.get("message") or "" for m in msgs if (m.get("from") or {}).get("id") == IG_ID]
+            if any(t.startswith(("Вот твой дом", "Привет! Твой дом", "Дом на Острове")) for t in ours) and igsid not in st["linked"]:
+                st["linked"].append(igsid)
             # what to answer: a known question, or the house link on a resident's very first message; else stay quiet
             topic = faq_topic(last.get("message"))
+            if topic and topic != "link" and next(a for k, _, a in FAQ if k == topic) in ours:
+                topic = None  # this answer is already in the chat
+            if topic == "link" and igsid in st["linked"]:
+                topic = None  # the link is already in the chat; a repeat question gets no second copy
             if topic is None and resident and igsid not in st["linked"]:
                 topic = "link"
             if topic == "link" and not resident:
