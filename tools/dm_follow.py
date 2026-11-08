@@ -36,6 +36,8 @@ INVITE_MAX_AGE_DAYS = 6  # Meta allows a private reply within 7 days of the comm
 
 INVITE = "Привет! Твой дом №{no} на Острове подписчиков уже стоит 🏝 Вот он: {url}\nПодпишись на @ostrov.podpischikov, чтобы дом остался за тобой 🙏"
 LINK = "Вот твой дом, житель №{no}: {url} 🏡"
+# not a follower yet: no house on the map, so no number either
+NO_HOUSE = "Дом на Острове подписчиков получают только подписчики 🏝\nПодпишись на @ostrov.podpischikov — и твой дом появится на карте: {url}"
 FOLLOW = "Чтобы дом остался за тобой — подпишись на @ostrov.podpischikov 🙏"
 
 
@@ -102,6 +104,8 @@ def main():
     st.setdefault("since", now.strftime("%Y-%m-%dT%H:%M:%S+0000"))
     follows = load(HERE / "follows.json", {})  # nick → true / false
     residents = {r["nick"]: r for r in load(HERE / "residents.json", [])}
+    # the number people see on the site and in the passport: followers only, from the published map
+    site_no = {r["nick"]: r["no"] for r in load(HERE.parent / "data" / "residents.json", {}).get("residents", [])}
 
     page, ptok, err = page_token(token())
     if err:
@@ -124,7 +128,10 @@ def main():
         todo = [(residents[n], c) for n, c in newest.items() if n not in invited_nicks and c["id"] not in st["invited"]
                 and (not only or n in only)]
         for r, c in todo[:MAX_INVITES_PER_RUN]:
-            text = INVITE.format(no=r["no"], url=SITE + r["nick"])
+            if r["nick"] in site_no:
+                text = INVITE.format(no=site_no[r["nick"]], url=SITE + r["nick"])
+            else:
+                text = NO_HOUSE.format(url=SITE[:-1])
             if args.dry_run:
                 print(f"  приглашение @{r['nick']}: {text}")
                 continue
@@ -171,10 +178,10 @@ def main():
             if st["answered"].get(igsid, "") >= last.get("created_time", "") or last.get("created_time", "") < st["since"]:
                 skipped["уже отвечено или старое"] = skipped.get("уже отвечено или старое", 0) + 1
                 continue  # already answered, or written before the replies were switched on
-            r = residents[nick]
-            text = LINK.format(no=r["no"], url=SITE + nick)
-            if follows.get(nick) is False:
-                text += "\n" + FOLLOW
+            if nick in site_no and follows.get(nick) is not False:
+                text = LINK.format(no=site_no[nick], url=SITE + nick)
+            else:
+                text = NO_HOUSE.format(url=SITE[:-1])
             if args.dry_run:
                 print(f"  ответ @{nick}: {text}")
                 continue
