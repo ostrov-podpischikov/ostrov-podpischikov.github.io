@@ -757,7 +757,7 @@
       houses.set(r.nick, {
         follows: r.follows !== false,
         mesh,
-        no: r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo,
+        no: r.gno || r.no, nick: r.nick, level: lvl, cell: [i, j], ring: d, biz: bizInfo, isle: opts.country || null,
         features: biz ? [biz.emoji + " " + biz.title + " " + bizInfo.label] : v.items.map((it) => FEATURES[it]), wished: (r.wish || []).length > 0 || !!biz,
         pos: new THREE.Vector3(x, y, z), top: new THREE.Vector3(x, y + (biz ? biz.h + 1.0 : lvl === 1 ? HUT_H[v.hut] : HEIGHT[lvl - 1]) * HOUSE + 0.6, z),
         kind: !biz && lvl === 1 ? HUT_KINDS[v.hut] : null,
@@ -842,14 +842,22 @@
     sign.rotation.y = -0.6;
     group.add(sign);
 
-    // the lighthouse everyone built together (goal 500, day 5): on a rock past the pier, with a turning beam
-    const lighthouse = buildLighthouse(THREE, new THREE.Vector3(2.5, 0, pz + 14));
-    group.add(lighthouse.group);
+    // a country island (opts.country, e.g. "kz"): a tall flag on the plaza instead of the sign, no lighthouse and no port
+    let lighthouse = null, flagPole = null;
+    if (opts.country) {
+      sign.visible = false;
+      flagPole = buildCountryFlag(THREE, opts.country);
+      group.add(flagPole.group);
+    } else {
+      // the lighthouse everyone built together (goal 500, day 5): on a rock past the pier, with a turning beam
+      lighthouse = buildLighthouse(THREE, new THREE.Vector3(2.5, 0, pz + 14));
+      group.add(lighthouse.group);
+    }
 
     // the port (goal 1000, day 6): a stone quay east of the pier with cranes, containers, a cargo ship and a warehouse
     let port = null;
     const housesCount = rows.filter((r) => !r.plot).length;
-    if (opts.port || (opts.port !== false && housesCount >= 999)) {
+    if (!opts.country && (opts.port || (opts.port !== false && housesCount >= 999))) {
       const at = new THREE.Vector3(10, 0, pz + 2);
       const pb = new Builder(THREE);
       buildPort(pb, at.x, at.z);
@@ -858,7 +866,37 @@
     }
 
     const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
-    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port };
+    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port, flagPole };
+  }
+
+  function drawKZ(f) {
+    f.fillStyle = "#00AFCA"; f.fillRect(0, 0, 300, 200);
+    f.fillStyle = "#FEC50C"; f.fillRect(14, 10, 14, 180);
+    f.beginPath(); f.arc(165, 85, 32, 0, Math.PI * 2); f.fill();
+    f.strokeStyle = "#FEC50C"; f.lineWidth = 5;
+    for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; f.beginPath(); f.moveTo(165 + Math.cos(a) * 38, 85 + Math.sin(a) * 38); f.lineTo(165 + Math.cos(a) * 52, 85 + Math.sin(a) * 52); f.stroke(); }
+    f.beginPath(); f.moveTo(105, 150); f.quadraticCurveTo(165, 120, 225, 150); f.quadraticCurveTo(165, 135, 105, 150); f.fill();
+  }
+  const FLAG_DRAW = { kz: drawKZ };
+
+  // the country's big flag on the plaza of its island
+  function buildCountryFlag(THREE, key) {
+    const g = new THREE.Group();
+    const box = (x, y, z, w, h, d, col, basic) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), basic ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshLambertMaterial({ color: col }));
+      m.position.set(x, y, z); g.add(m); return m;
+    };
+    box(0, 2.3, 0, 3.4, 0.6, 3.4, "#9EA3AA"); box(0, 2.75, 0, 2.2, 0.3, 2.2, "#C9CED6");
+    box(0, 2.9 + 11, 0, 0.45, 22, 0.45, "#D8DDE3");
+    box(0, 25.2, 0, 0.9, 0.9, 0.9, "#F4D35E", true);
+    const fc = document.createElement("canvas"); fc.width = 300; fc.height = 200;
+    (FLAG_DRAW[key] || drawKZ)(fc.getContext("2d"));
+    const fg = new THREE.PlaneGeometry(11.4, 7.6, 16, 1); fg.translate(5.95, 0, 0);
+    const flag = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc), side: THREE.DoubleSide }));
+    flag.position.set(0.2, 20.6, 0);
+    flag.userData.base = fg.attributes.position.array.slice();
+    g.add(flag);
+    return { group: g, flag };
   }
 
   // the port, in boxes; (x, z) is its south-west land corner, the quay reaches out into the sea along +z
