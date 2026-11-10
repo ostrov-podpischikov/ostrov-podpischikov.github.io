@@ -303,6 +303,7 @@
     // the in-app browser must never see a drag on the island as its own swipe gesture
     canvas.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
+    var freeTop = 0, freeBottom = innerHeight;   // the screen band not covered by the panels (set in resize)
     function resize() {
       const w = window.innerWidth, h = window.innerHeight;
       renderer.setSize(w, h, false);
@@ -315,6 +316,7 @@
         if (!r.height || getComputedStyle(el).display === "none") return;
         if (r.top < h / 2) top = Math.max(top, r.bottom); else bottom = Math.min(bottom, r.top);
       });
+      freeTop = top; freeBottom = bottom;
       const dy = Math.max(0, Math.min(h * 0.25, (top + bottom) / 2 - h / 2));
       if (dy > 2) camera.setViewOffset(w, h, 0, -dy, w, h); else camera.clearViewOffset();
       camera.updateProjectionMatrix();
@@ -490,22 +492,37 @@
       const e = camera.matrixWorld.elements, key = e.map((x) => x.toFixed(2)).join() + selected + innerWidth + "x" + innerHeight;
       if (key === lastView) return;
       lastView = key;
-      const maxTags = window.innerWidth < 600 ? 22 : 45;
+      const maxTags = window.innerWidth < 600 ? 30 : 50;
+      const farTag = Math.max(160, camera.position.distanceTo(controls.target) * 2.5);
       const list = [];
       // a business already shows the nick on its sign board, so it gets no floating tag unless selected
       island.houses.forEach((h) => { if (h.nick !== selected && !h.biz) list.push([h.top.distanceToSquared(camera.position), h]); });
-      list.sort((a, b) => a[0] - b[0]);
-      const show = list.slice(0, maxTags).map((x) => x[1]);
+      // nearest houses ON SCREEN: the nearest overall sit under the bottom edge in a far view, and then no nick showed at all
+      // and only the part not covered by the panels; spread over a screen grid (nearest house per cell), so a far view
+      // gets nicks all over the island instead of a clump at the bottom edge
+      const W = innerWidth, Hh = innerHeight, cell = {}, cw = W < 600 ? 110 : 150, ch = 46;
+      list.forEach((e) => {
+        v.copy(e[1].top).project(camera);
+        if (v.z > 1 || Math.abs(v.x) > 1) return;
+        const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * Hh;
+        if (sy < freeTop + 24 || sy > freeBottom - 4) return;
+        const k = Math.floor(sx / cw) + "," + Math.floor(sy / ch);
+        if (!cell[k] || cell[k][0] > e[0]) cell[k] = e;
+      });
+      const onScreen = Object.values(cell).sort((a, b) => a[0] - b[0]);
+      const show = onScreen.slice(0, maxTags * 2).map((x) => x[1]);
       if (selected && island.houses.has(selected)) show.unshift(island.houses.get(selected));
       const w = window.innerWidth, hgt = window.innerHeight, placed = [];
       let used = 0;
       show.forEach((h) => {
+        if (used >= maxTags + 1) return;
         v.copy(h.top).project(camera);
         if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
         const me = h.nick === selected;
         const dist = Math.sqrt(h.top.distanceToSquared(camera.position));
-        if (!me && dist > 160) return;
-        const s = me ? 1 : Math.max(0.6, Math.min(1.1, 45 / dist));
+        // far views still show the nearest nicks: the cut-off grows with the zoom
+        if (!me && dist > farTag) return;
+        const s = me ? 1 : Math.max(0.75, Math.min(1.1, 45 / dist));
         const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * hgt;
         const bw = (h.nick.length + 1) * (me ? 9.5 : 7) * s + 18, bh = (me ? 28 : 21) * s;
         const box = [x - bw / 2, y - bh, x + bw / 2, y];
