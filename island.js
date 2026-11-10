@@ -554,8 +554,8 @@
     g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 384, 118);
     g.textAlign = "center"; g.textBaseline = "middle";
     // the plot waits for a follower who has not commented yet: their place in line, and the one step left
-    g.fillStyle = "#1B2129"; g.font = "900 30px Montserrat, sans-serif"; g.fillText(follower ? "УЧАСТОК ПОДПИСЧИКА" : "ДЛЯ ПОДПИСЧИКА №" + no, 192, 30, 360);
-    g.fillStyle = "#C8473D"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("НАПИШИ КОММЕНТ —", 192, 66, 360);
+    g.fillStyle = "#1B2129"; g.font = "900 30px Montserrat, sans-serif"; g.fillText(follower ? "УЧАСТОК ПОДПИСЧИКА" : "СВОБОДНЫЙ УЧАСТОК", 192, 30, 360);
+    g.fillStyle = "#C8473D"; g.font = "800 25px Montserrat, sans-serif"; g.fillText(follower ? "НАПИШИ КОММЕНТ —" : "ПОДПИШИСЬ —", 192, 66, 360);
     g.fillStyle = "#1B2129"; g.font = "800 25px Montserrat, sans-serif"; g.fillText("И ДОМ ТВОЙ", 192, 96, 360);
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
@@ -777,27 +777,24 @@
       b.box(x - 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2).box(x + 1.6, y + 1.2, z + 0.6, 0.16, 2.4, 0.16, C.log2);
       b.box(x, y + 2.0, z + 0.62, 3.7, 1.25, 0.1, "#F4C430");
     });
-    // each board names its plot (the number the next commenter gets) and says what to do, on both faces
+    // the boards on both faces: one shared texture and one instanced mesh per kind — a board per plot as its own
+    // mesh with its own canvas was ~1000 draw calls and hundreds of textures, and hung phones
     const plateGeo = new THREE.PlaneGeometry(3.5, 1.08);
-    emptyCells.forEach(([i, j], k) => {
-      const mat = new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE, lastNo + 1 + k) });
-      const front = new THREE.Mesh(plateGeo, mat), back = new THREE.Mesh(plateGeo, mat);
-      front.position.set(i * PLOT, 4.0, j * PLOT + 0.68);
-      back.position.set(i * PLOT, 4.0, j * PLOT + 0.56);
-      back.rotation.y = Math.PI;
-      group.add(front, back);
-    });
-    // followers' plots share one board (hundreds of canvases would not fit a phone); the nick floats above as a label
-    if (named.length) {
-      const mat = new THREE.MeshBasicMaterial({ map: emptySignTexture(THREE, 0, true) });
-      named.forEach(([i, j]) => {
-        const front = new THREE.Mesh(plateGeo, mat), back = new THREE.Mesh(plateGeo, mat);
-        front.position.set(i * PLOT, 4.0, j * PLOT + 0.68);
-        back.position.set(i * PLOT, 4.0, j * PLOT + 0.56);
-        back.rotation.y = Math.PI;
-        group.add(front, back);
+    const plates = (cells, tex) => {
+      if (!cells.length) return;
+      const im = new THREE.InstancedMesh(plateGeo, new THREE.MeshBasicMaterial({ map: tex }), cells.length * 2);
+      const m = new THREE.Matrix4(), flip = new THREE.Matrix4().makeRotationY(Math.PI);
+      cells.forEach(([i, j], k) => {
+        im.setMatrixAt(k * 2, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.68));
+        im.setMatrixAt(k * 2 + 1, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.56).multiply(flip));
       });
-    }
+      im.instanceMatrix.needsUpdate = true;
+      im.frustumCulled = false;   // three 0.147 culls instances by the one plane's bounds at the origin
+      group.add(im);
+    };
+    plates(emptyCells, emptySignTexture(THREE, 0));
+    // followers' plots: the nick floats above as a label
+    plates(named, emptySignTexture(THREE, 0, true));
 
     // plaza: big campfire, log benches, the founder's hut and the sign
     b.box(0, 2.06, 0, PLOT - STREET + 0.2, 0.06, PLOT - STREET + 0.2, C.path);
@@ -877,7 +874,42 @@
     for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; f.beginPath(); f.moveTo(165 + Math.cos(a) * 38, 85 + Math.sin(a) * 38); f.lineTo(165 + Math.cos(a) * 52, 85 + Math.sin(a) * 52); f.stroke(); }
     f.beginPath(); f.moveTo(105, 150); f.quadraticCurveTo(165, 120, 225, 150); f.quadraticCurveTo(165, 135, 105, 150); f.fill();
   }
-  const FLAG_DRAW = { kz: drawKZ };
+  function drawKG(f) {
+    f.fillStyle = "#E8112D"; f.fillRect(0, 0, 300, 200);
+    f.fillStyle = "#FFEF00";
+    for (let k = 0; k < 40; k++) {   // 40 rays of the sun
+      const a = (k / 40) * Math.PI * 2, b = a + Math.PI / 40;
+      f.beginPath(); f.moveTo(150 + Math.cos(a - 0.05) * 32, 100 + Math.sin(a - 0.05) * 32);
+      f.lineTo(150 + Math.cos(b - Math.PI / 80) * 62, 100 + Math.sin(b - Math.PI / 80) * 62);
+      f.lineTo(150 + Math.cos(a + 0.05) * 32, 100 + Math.sin(a + 0.05) * 32); f.fill();
+    }
+    f.beginPath(); f.arc(150, 100, 36, 0, Math.PI * 2); f.fill();
+    // the tunduk: the crown of a yurt
+    f.strokeStyle = "#E8112D"; f.lineWidth = 4;
+    f.beginPath(); f.arc(150, 100, 24, 0, Math.PI * 2); f.stroke();
+    for (const dx of [-8, 0, 8]) {
+      f.beginPath(); f.moveTo(150 + dx, 77); f.quadraticCurveTo(150 + dx * 2.2, 100, 150 + dx, 123); f.stroke();
+      f.beginPath(); f.moveTo(127, 100 + dx); f.quadraticCurveTo(150, 100 + dx * 2.2, 173, 100 + dx); f.stroke();
+    }
+  }
+  function drawUZ(f) {
+    f.fillStyle = "#0099B5"; f.fillRect(0, 0, 300, 66);
+    f.fillStyle = "#CE1126"; f.fillRect(0, 64, 300, 72);
+    f.fillStyle = "#FFFFFF"; f.fillRect(0, 68, 300, 64);
+    f.fillStyle = "#1EB53A"; f.fillRect(0, 136, 300, 64);
+    f.fillStyle = "#FFFFFF"; f.beginPath(); f.arc(42, 33, 22, 0, Math.PI * 2); f.fill();
+    f.fillStyle = "#0099B5"; f.beginPath(); f.arc(50, 33, 20, 0, Math.PI * 2); f.fill();
+    f.fillStyle = "#FFFFFF";
+    [[3, 0], [4, 1], [5, 2]].forEach(([n, row]) => {   // 12 stars: 3, 4 and 5 in rows, aligned right
+      for (let k = 0; k < n; k++) { f.beginPath(); f.arc(130 - k * 14, 14 + row * 15, 3.4, 0, Math.PI * 2); f.fill(); }
+    });
+  }
+  // any other country: its flag emoji on white
+  const drawEmoji = (emoji) => (f) => {
+    f.fillStyle = "#FFFFFF"; f.fillRect(0, 0, 300, 200);
+    f.font = "150px sans-serif"; f.textAlign = "center"; f.textBaseline = "middle"; f.fillText(emoji, 150, 108);
+  };
+  const FLAG_DRAW = { kz: drawKZ, kg: drawKG, uz: drawUZ, tj: drawEmoji("🇹🇯"), am: drawEmoji("🇦🇲"), az: drawEmoji("🇦🇿"), ru: drawEmoji("🇷🇺") };
 
   // the country's big flag on the plaza of its island
   function buildCountryFlag(THREE, key) {
