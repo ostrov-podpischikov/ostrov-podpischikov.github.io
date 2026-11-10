@@ -32,6 +32,7 @@
     hammock: "🏝 гамак", laundry: "👕 сушилка", torch: "🕯 факел", pot: "🌺 цветок", boat: "🛶 лодка",
     pet: "🐶 питомец", ball: "⚽ мяч", lamp: "🏮 фонарь", palm: "🌴 пальма", horse: "🐴 лошадка",
     car: "🚗 машина", pool: "🏊 бассейн", moto: "🏍 мотоцикл", parrot: "🦜 попугай",
+    flowers: "🌷 клумба", bush: "🌳 куст", bench: "🪑 лавочка", mailbox: "📮 почтовый ящик",
   };
   const COLORS = {
     red: "#E2483D", blue: "#2E86AB", green: "#3FA34D", yellow: "#F4D35E", pink: "#FF7AA8",
@@ -51,7 +52,9 @@
   const MUD = [["#D9A066", "#C68B59"], ["#E6C9A0", "#CDAE82"], ["#E8D8C0", "#CFBFA5"], ["#C97B5A", "#A9603F"]];
   const HULLS = [["#2E86AB", "#1F6E8E"], ["#E2483D", "#B93A31"], ["#3FA34D", "#2F8C3E"], ["#F4D35E", "#D9B840"], ["#F5F5F5", "#D8D8D8"]];
   const ROOFS = ["#D9452F", "#2E86AB", "#3FA34D", "#8E5BD9", "#F08A24", "#B23A48"];
-  const ACCESSORIES = ["flag", "fire", "barrel", "chest", "surf", "hammock", "laundry", "torch", "pot"];
+  // random yard décor; flowers and bushes are cheap in boxes, so they come up more often
+  const ACCESSORIES = ["flag", "fire", "barrel", "chest", "surf", "hammock", "laundry", "torch", "pot",
+    "flowers", "flowers", "flowers", "bush", "bush", "bench", "mailbox"];
 
   const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
   const strHash = (s, salt) => { let h = 2166136261 ^ (salt || 0); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
@@ -261,6 +264,16 @@
   // ── yard items; slot gives the spot on the pad
   const SLOTS = [[1.75, 1.55], [-1.75, 1.55], [1.75, -1.6], [-1.75, -1.6]];
   const ITEMS = {
+    flowers: (b, x, y, z) => {
+      b.box(x, y + 0.08, z, 1.3, 0.16, 0.6, C.soil);
+      [[-0.42, "#FF7AA8"], [0, "#FFE066"], [0.42, "#E2483D"]].forEach(([d, c]) => b.box(x + d, y + 0.3, z, 0.1, 0.3, 0.1, C.leaf).box(x + d, y + 0.52, z, 0.28, 0.2, 0.28, c));
+    },
+    bush: (b, x, y, z) => { b.box(x, y + 0.35, z, 0.95, 0.7, 0.95, C.leaf).box(x + 0.15, y + 0.78, z - 0.1, 0.55, 0.4, 0.55, C.leaf2).box(x - 0.2, y + 0.72, z + 0.25, 0.2, 0.2, 0.2, C.flower); },
+    bench: (b, x, y, z) => {
+      b.box(x - 0.5, y + 0.22, z, 0.12, 0.44, 0.36, C.log2).box(x + 0.5, y + 0.22, z, 0.12, 0.44, 0.36, C.log2);
+      b.box(x, y + 0.48, z, 1.3, 0.1, 0.42, C.plank).box(x, y + 0.75, z - 0.2, 1.3, 0.36, 0.08, C.plank2);
+    },
+    mailbox: (b, x, y, z, v) => { b.box(x, y + 0.45, z, 0.1, 0.9, 0.1, C.log2).box(x, y + 0.98, z, 0.34, 0.3, 0.5, v.flag).box(x + 0.2, y + 1.1, z + 0.1, 0.04, 0.24, 0.06, C.red); },
     flag: (b, x, y, z, v) => { b.box(x, y + 1.6, z, 0.1, 3.2, 0.1, "#DDDDDD"); b.box(x + 0.48, y + 2.9, z, 0.9, 0.55, 0.05, v.flag); },
     fire: (b, x, y, z) => {
       b.box(x, y + 0.1, z, 1.0, 0.18, 0.25, C.log2, C.log2, 0, 0.6).box(x, y + 0.1, z, 1.0, 0.18, 0.25, C.log2, C.log2, 0, -0.6);
@@ -527,8 +540,14 @@
     if (colorWish && v.hut === 7) { v.h1 = COLORS[colorWish]; }
     else if (colorWish && v.hut !== 3) { v.c1 = COLORS[colorWish]; }
     wish.forEach((w) => { if (ITEMS[w] && !v.items.includes(w)) v.items.push(w); });
-    // one or two random yard items on top of the wished ones, four at most; a crowded island keeps only every third one
-    const want = lite ? v.items.length + (strHash(n, 6) < 0.33 ? 1 : 0) : Math.min(4, v.items.length + 1 + (strHash(n, 6) < 0.45 ? 1 : 0));
+    // the richer the house, the richer the yard: a car or a motorbike from level 3, a pool from level 5, a pet anywhere
+    const lvl = Math.min(7, Math.max(1, r.level || 1));
+    const add = (it) => { if (v.items.length < 4 && !v.items.includes(it)) v.items.push(it); };
+    if (lvl >= 3 && strHash(n, 31) < 0.45) add(strHash(n, 32) < 0.6 ? "car" : "moto");
+    if (lvl >= 5 && strHash(n, 33) < 0.5) add("pool");
+    if (strHash(n, 34) < 0.18) add("pet");
+    // then random décor, four items at most: every yard gets at least one (a crowded island: one, sometimes two)
+    const want = lite ? Math.min(4, Math.max(v.items.length, 1) + (strHash(n, 6) < 0.3 ? 1 : 0)) : Math.min(4, v.items.length + 1 + (strHash(n, 6) < 0.45 ? 1 : 0));
     for (let k = 0; v.items.length < want && k < 20; k++) {
       const it = ACCESSORIES[Math.floor(strHash(n, 10 + k) * ACCESSORIES.length)];
       if (!v.items.includes(it)) v.items.push(it);
