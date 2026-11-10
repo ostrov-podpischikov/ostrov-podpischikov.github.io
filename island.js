@@ -23,8 +23,11 @@
     { name: "Домик", emoji: "🏠" },
     { name: "Коттедж", emoji: "🏡" },
     { name: "Особняк", emoji: "🏘" },
-    { name: "Вилла", emoji: "🏰" },
+    { name: "Вилла", emoji: "🌴" },
     { name: "Маяк", emoji: "🗼" },
+    { name: "Усадьба", emoji: "🏛" },
+    { name: "Дворец", emoji: "🕌" },
+    { name: "Замок", emoji: "🏰" },
   ];
   // features shown on the resident card
   const FEATURES = {
@@ -386,8 +389,54 @@
       b.box(x, y + 7.55, z, 1.3, 0.8, 1.3, C.lamp, C.lamp).box(x, y + 8.15, z, 1.6, 0.4, 1.6, v.roof);
       b.box(x, y + 0.05, z, 2.6, 0.1, 2.6, C.stone);
     },
+    // 8 — Усадьба: two floors, a white portico with four columns, two chimneys
+    (b, x, y, z, v) => {
+      b.box(x, y + 1.0, z - 0.3, 3.5, 2.0, 2.4, C.cream).box(x, y + 2.75, z - 0.3, 3.5, 1.5, 2.4, C.cream);
+      b.box(x, y + 2.02, z - 0.3, 3.7, 0.14, 2.6, C.white);
+      gable(b, x, y + 3.5, z - 0.3, 3.5, 2.4, v.roof, 1.1);
+      b.box(x - 1.2, y + 4.3, z - 0.8, 0.35, 1.0, 0.35, C.brick).box(x + 1.2, y + 4.3, z - 0.8, 0.35, 1.0, 0.35, C.brick);
+      [-0.75, -0.25, 0.25, 0.75].forEach((dx) => b.box(x + dx, y + 1.2, z + 1.25, 0.18, 2.4, 0.18, C.white));
+      b.box(x, y + 2.5, z + 1.25, 1.9, 0.2, 0.7, C.white).box(x, y + 2.75, z + 1.2, 1.5, 0.3, 0.5, v.roof);
+      b.box(x, y + 0.65, z + 0.92, 0.6, 1.3, 0.06, C.door);
+      [-1.3, -0.75, 0.75, 1.3].forEach((dx) => b.box(x + dx, y + 1.2, z + 0.92, 0.4, 0.6, 0.06, C.glass).box(x + dx, y + 2.8, z + 0.92, 0.4, 0.55, 0.06, C.glass));
+      b.box(x, y + 0.08, z + 1.55, 1.4, 0.16, 0.6, C.stone);
+    },
+    // 9 — Дворец: a wide palace with two towers and a golden dome
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.95, z - 0.2, 3.6, 1.9, 2.6, v.w, v.w2).box(x, y + 2.6, z - 0.2, 2.8, 1.4, 2.2, v.w, v.w2);
+      b.box(x, y + 1.95, z - 0.2, 3.8, 0.14, 2.8, C.white).box(x, y + 3.35, z - 0.2, 3.0, 0.14, 2.4, C.white);
+      [1.3, 1.0, 0.7, 0.4].forEach((s, i) => b.box(x, y + 3.6 + i * 0.32, z - 0.2, s, 0.32, s, C.gold));
+      b.box(x, y + 5.0, z - 0.2, 0.1, 0.5, 0.1, C.gold);
+      [-1.65, 1.65].forEach((dx) => {
+        b.box(x + dx, y + 2.1, z + 0.7, 0.8, 4.2, 0.8, C.white);
+        b.box(x + dx, y + 4.35, z + 0.7, 0.95, 0.3, 0.95, v.roof).box(x + dx, y + 4.7, z + 0.7, 0.6, 0.4, 0.6, v.roof).box(x + dx, y + 5.05, z + 0.7, 0.3, 0.3, 0.3, v.roof);
+        b.box(x + dx, y + 5.4, z + 0.7, 0.08, 0.4, 0.08, C.gold);
+        b.box(x + dx, y + 3.3, z + 1.11, 0.3, 0.45, 0.04, C.glass).box(x + dx, y + 1.8, z + 1.11, 0.3, 0.45, 0.04, C.glass);
+      });
+      b.box(x, y + 0.75, z + 1.12, 0.8, 1.5, 0.06, C.gold).box(x, y + 0.75, z + 1.14, 0.6, 1.3, 0.04, C.door);
+      [-0.8, 0.8].forEach((dx) => b.box(x + dx, y + 1.2, z + 1.12, 0.45, 0.7, 0.06, C.glass));
+      b.box(x, y + 2.6, z + 0.92, 1.6, 0.6, 0.06, C.glass);
+      b.box(x, y + 0.06, z + 1.6, 1.6, 0.12, 0.7, C.white).box(x, y + 0.14, z + 1.6, 1.2, 0.04, 0.4, C.pool, C.pool);
+    },
+    // 10 — Замок: stone walls with battlements, four corner towers, a tall keep with the owner's flag
+    (b, x, y, z, v) => {
+      b.box(x, y + 1.1, z - 0.2, 3.4, 2.2, 2.8, C.stone, C.stone2);
+      for (let i = -3; i <= 3; i++) b.box(x + i * 0.5, y + 2.35, z + 1.15, 0.28, 0.3, 0.3, C.stone);
+      for (let i = -2; i <= 2; i++) { b.box(x - 1.65, y + 2.35, z - 0.2 + i * 0.55, 0.3, 0.3, 0.28, C.stone); b.box(x + 1.65, y + 2.35, z - 0.2 + i * 0.55, 0.3, 0.3, 0.28, C.stone); }
+      [[-1.6, 1.15], [1.6, 1.15], [-1.6, -1.55], [1.6, -1.55]].forEach(([dx, dz]) => {
+        b.box(x + dx, y + 1.6, z + dz, 0.9, 3.2, 0.9, C.stone2, C.stone2);
+        b.box(x + dx, y + 3.35, z + dz, 1.05, 0.3, 1.05, C.stone);
+        b.box(x + dx, y + 3.75, z + dz, 0.75, 0.5, 0.75, v.roof).box(x + dx, y + 4.2, z + dz, 0.45, 0.4, 0.45, v.roof).box(x + dx, y + 4.55, z + dz, 0.2, 0.3, 0.2, v.roof);
+      });
+      b.box(x, y + 2.6, z - 0.4, 1.5, 5.2, 1.5, C.stone, C.stone2);
+      for (let i = -1; i <= 1; i++) b.box(x + i * 0.55, y + 5.35, z + 0.32, 0.3, 0.3, 0.12, C.stone);
+      b.box(x, y + 4.0, z + 0.36, 0.35, 0.6, 0.04, C.glass).box(x, y + 2.8, z + 0.36, 0.35, 0.6, 0.04, C.glass);
+      b.box(x, y + 6.1, z - 0.4, 0.08, 1.4, 0.08, C.white).box(x + 0.4, y + 6.5, z - 0.4, 0.75, 0.45, 0.04, v.flag);
+      b.box(x, y + 0.75, z + 1.21, 0.9, 1.5, 0.06, C.door).box(x, y + 1.55, z + 1.21, 1.1, 0.14, 0.08, C.log2);
+    },
   ];
-  const HEIGHT = [2.6, 2.6, 3.0, 3.3, 4.2, 3.4, 8.6];
+  const HEIGHT = [2.6, 2.6, 3.0, 3.3, 4.2, 3.4, 8.6, 4.9, 5.7, 7.0];
+  const MAX_LEVEL = MODELS.length;
 
   // ── businesses: a resident who asked for one in a comment gets it instead of a hut.
   // Every model faces +z; the sign board hangs at SIGN_Z in front, its height is h + 0.45.
@@ -541,7 +590,7 @@
     else if (colorWish && v.hut !== 3) { v.c1 = COLORS[colorWish]; }
     wish.forEach((w) => { if (ITEMS[w] && !v.items.includes(w)) v.items.push(w); });
     // the richer the house, the richer the yard: a car or a motorbike from level 3, a pool from level 5, a pet anywhere
-    const lvl = Math.min(7, Math.max(1, r.level || 1));
+    const lvl = Math.min(MAX_LEVEL, Math.max(1, r.level || 1));
     const add = (it) => { if (v.items.length < 4 && !v.items.includes(it)) v.items.push(it); };
     if (lvl >= 3 && strHash(n, 31) < 0.45) add(strHash(n, 32) < 0.6 ? "car" : "moto");
     if (lvl >= 5 && strHash(n, 33) < 0.5) add("pool");
@@ -716,7 +765,7 @@
         });
         return;
       }
-      const lvl = Math.min(7, Math.max(1, r.level || 1));
+      const lvl = Math.min(MAX_LEVEL, Math.max(1, r.level || 1));
       const v = look(r, lite);
       const biz = BIZ[r.biz];
       b.box(x, y + 0.05, z, PLOT - STREET, 0.1, PLOT - STREET, biz ? C.stone : C.pad);
@@ -1056,5 +1105,5 @@
     return { group: g, beam, pos: at.clone(), top: at.clone().add(new THREE.Vector3(0, y + 3.5, 0)) };
   }
 
-  root.OstrovIsland = { build, plotCell, look, LEVELS, FEATURES, PLOT, BIZ };
+  root.OstrovIsland = { build, plotCell, look, LEVELS, MAX_LEVEL, FEATURES, PLOT, BIZ };
 })(typeof window !== "undefined" ? window : globalThis);
