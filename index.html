@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=14"></script>
+  <script src="island.js?v=15"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -260,9 +260,13 @@
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     // whole-number ratio only: a fractional one (1.5×) is resampled by iOS and shimmers
     // 3× phones (iPhone) get their full resolution; everything else stays at 1× or 2×
-    renderer.setPixelRatio(window.devicePixelRatio >= 2.75 ? 3 : Math.min(Math.round(window.devicePixelRatio) || 1, 2));
+    // capped at 2×: at 3× a phone drew 9× the pixels of the island with ~8000 houses and hung
+    renderer.setPixelRatio(Math.min(Math.round(window.devicePixelRatio) || 1, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // the island stands still: redraw the shadow map only when its box moves or the island is rebuilt, not every
+    // frame — the shadow pass drew all the geometry a second time
+    renderer.shadowMap.autoUpdate = false;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#8fd6f6");
     // near plane at 1 (not 0.1): far better depth precision, so flat ground pieces stop flickering through each other
@@ -326,30 +330,42 @@
     const district = (ring) => DISTRICTS.find((d) => ring <= d[0])[1];
 
     // ── data and island
-    let island, residents = [], emptyPlots = 0, kzIsle = null;
+    // country islands won in votes: where each one sits beside the main island (a direction towards the start camera)
+    const COUNTRIES = {
+      kz: { emoji: "🇰🇿", name: "Казахстан", of: "Казахстана", dir: [0.94, 0.34], note: "Первый остров страны" },
+      kg: { emoji: "🇰🇬", name: "Кыргызстан", of: "Кыргызстана", dir: [0.3, 0.95], note: "Второй остров страны" },
+      uz: { emoji: "🇺🇿", name: "Узбекистан", of: "Узбекистана", dir: [0.3, 0.95], note: "Второй остров страны" },
+      tj: { emoji: "🇹🇯", name: "Таджикистан", of: "Таджикистана", dir: [0.3, 0.95], note: "Второй остров страны" },
+    };
+    const isleName = (key) => (COUNTRIES[key] ? `${COUNTRIES[key].emoji} Остров ${COUNTRIES[key].of}` : null);
+    let island, residents = [], emptyPlots = 0, isles = [];
     function showIsland(list) {
-      [island, kzIsle].forEach((x) => {
+      [island, ...isles].forEach((x) => {
         if (!x) return;
         scene.remove(x.group);
         x.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
       });
-      kzIsle = null;
-      // followers who voted «Казахстан» live on the Kazakh island (field c); each island numbers its own plots, the card keeps the real №
+      isles = [];
+      // followers who voted for a winning country live on its island (field c); each island numbers its own plots, the card keeps the real №
       const local = (rows) => rows.map((r, k) => ({ ...r, gno: r.no, no: k + 2 }));
-      const home = list.filter((r) => !r.c), kz = list.filter((r) => r.c === "kz");
+      const home = list.filter((r) => !COUNTRIES[r.c]);
       // empty plots for followers without a comment, only on today's full island
       island = OstrovIsland.build(THREE, local(home), { emptyPlots: list === residents ? emptyPlots : 0 });
       scene.add(island.group);
-      if (kz.length) {
-        kzIsle = OstrovIsland.build(THREE, local(kz), { country: "kz" });
-        // beside the main island, towards the start camera so it shows on the first screen
-        const d = island.radius + kzIsle.radius + 22, at = new THREE.Vector3(d * 0.94, 0, d * 0.34);
-        kzIsle.group.position.copy(at);
-        kzIsle.at = at;
-        scene.add(kzIsle.group);
+      Object.entries(COUNTRIES).forEach(([key, info]) => {
+        const rows = list.filter((r) => r.c === key);
+        if (!rows.length) return;
+        const isle = OstrovIsland.build(THREE, local(rows), { country: key });
+        const d = island.radius + isle.radius + 22, at = new THREE.Vector3(d * info.dir[0], 0, d * info.dir[1]);
+        isle.group.position.copy(at);
+        isle.at = at;
+        isle.key = key;
+        scene.add(isle.group);
         // one map of houses for search, labels and cards, in world coordinates
-        kzIsle.houses.forEach((h, n) => { h.pos.add(at); h.top.add(at); island.houses.set(n, h); });
-      }
+        isle.houses.forEach((h, n) => { h.pos.add(at); h.top.add(at); island.houses.set(n, h); });
+        isles.push(isle);
+      });
+      renderer.shadowMap.needsUpdate = true;
     }
     // GitHub Pages is often slow to serve the big list; raw.githubusercontent is the same file and much faster,
     // so try it first (5 s) and fall back to the site copy
@@ -386,7 +402,8 @@
         scene.fog = new THREE.Fog("#a8e0f8", R * 3, R * 7);
         // on a phone start closer and from above, so houses fill the screen instead of the sky
         viewMain(0);
-        $("tIsle").style.display = kzIsle ? "" : "none";
+        $("tIsle").style.display = isles.length ? "" : "none";
+        if (isles.length) $("tIsle").innerHTML = `<span>${COUNTRIES[isles[0].key].emoji}</span>${COUNTRIES[isles[0].key].name}`;
         $("loading").remove();
         const fromLink = norm(new URLSearchParams(location.search).get("nick") || decodeURIComponent(location.hash.slice(1)));
         if (fromLink) {
@@ -465,6 +482,7 @@
     function fitShadow() {
       const t = controls.target, s = Math.max(40, Math.min(shadowR, camera.position.distanceTo(t) * 0.9));
       const snap = (v) => Math.round(v / 4) * 4; // move in steps, so the shadow edges don't crawl
+      if (snap(t.x) !== sun.target.position.x || snap(t.z) !== sun.target.position.z || Math.abs(s - shadowS) > s * 0.08) renderer.shadowMap.needsUpdate = true;
       sun.target.position.set(snap(t.x), 0, snap(t.z));
       sun.position.set(sun.target.position.x - s * 0.9, s * 1.6 + 20, sun.target.position.z + s * 0.8);
       if (Math.abs(s - shadowS) > s * 0.08) {
@@ -490,20 +508,23 @@
       // keep the view over the island: dragging can't carry it out to the open ocean
       // with a country island the view may also sit over it, or over the strait between the two
       const t = controls.target;
-      let cx = 0, cz = 0, lim = island ? island.radius * 1.1 : 0;
-      if (kzIsle) {
-        const a = kzIsle.at, len = a.length(), u = Math.max(0, Math.min(1, (t.x * a.x + t.z * a.z) / (len * len)));
-        cx = a.x * u; cz = a.z * u;   // nearest point on the line between the two centres
-        lim = (island.radius + (kzIsle.radius - island.radius) * u) * 1.1;
-      }
+      // several country islands: the strait that keeps the view closest to inside its bounds wins
+      let cx = 0, cz = 0, lim = island ? island.radius * 1.1 : 0, best = lim ? Math.hypot(t.x, t.z) / lim : 0;
+      isles.forEach((isle) => {
+        const a = isle.at, len = a.length(), u = Math.max(0, Math.min(1, (t.x * a.x + t.z * a.z) / (len * len)));
+        const x = a.x * u, z = a.z * u;   // nearest point on the line between the two centres
+        const l = (island.radius + (isle.radius - island.radius) * u) * 1.1, r = Math.hypot(t.x - x, t.z - z) / l;
+        if (r < best) { best = r; cx = x; cz = z; lim = l; }
+      });
       const dx = t.x - cx, dz = t.z - cz, d = Math.hypot(dx, dz);
       if (lim && d > lim) { panOffset.set(dx, 0, dz).multiplyScalar(lim / d - 1); t.add(panOffset); camera.position.add(panOffset); }
       if (island && island.lighthouse) island.lighthouse.beam.rotation.y = now / 1600;
-      if (kzIsle && kzIsle.flagPole) {
-        const f = kzIsle.flagPole.flag, p = f.geometry.attributes.position, b = f.userData.base;
+      isles.forEach((isle) => {
+        if (!isle.flagPole) return;
+        const f = isle.flagPole.flag, p = f.geometry.attributes.position, b = f.userData.base;
         for (let i = 0; i < p.count; i++) { const x = b[i * 3]; p.array[i * 3 + 2] = Math.sin(x * 0.9 - now / 260) * 0.08 * x; }
         p.needsUpdate = true;
-      }
+      });
       if (marker.visible) { marker.position.y = marker.userData.y + Math.sin(now / 250) * 0.4; marker.rotation.y = now / 600; }
       renderer.render(scene, camera);
       drawLabels();
@@ -569,7 +590,7 @@
       const day = dayOf(r.since);
       sheet.innerHTML = `<div class="top"><div><div class="nick">@${esc(h.nick)}</div><span class="badge">${h.plot ? "УЧАСТОК" : "ЖИТЕЛЬ"} №${h.no}</span></div><button class="x" data-close>×</button></div>
         <div class="fields">
-          <div><span>Район</span><span>${(h.isle === "kz" ? "🇰🇿 Остров Казахстана" : district(h.ring || 0))}</span></div>
+          <div><span>Район</span><span>${(isleName(h.isle) || district(h.ring || 0))}</span></div>
           ${h.plot ? `<div><span>Дом</span><span>📍 пока участок</span></div>
           <div><span>Как построить</span><span>напиши любой коммент под рилсом — и тут вырастет дом</span></div>`
           : `<div><span>Заселился</span><span>${day ? "день " + day : "—"}</span></div>`}
@@ -587,7 +608,7 @@
         <button class="btn dark full" id="lvlUp">⬆️ Прокачай дом — задания</button>`;
       $("lvlUp").onclick = () => openDrawer("quests");
       $("share").onclick = () => shareLink(h);
-      $("pass").onclick = () => openPassport(h, (h.isle === "kz" ? "🇰🇿 Остров Казахстана" : district(h.ring || 0)), day);
+      $("pass").onclick = () => openPassport(h, (isleName(h.isle) || district(h.ring || 0)), day);
       frameHouse(h);
     }
     // frame the house in the free band between the top panels and the card (measured after the card is rendered):
@@ -676,7 +697,10 @@
       if (top && top.level > 1) items.push([OstrovIsland.LEVELS[top.level - 1].emoji, "Лучший дом острова", "@" + top.nick + " · " + OstrovIsland.LEVELS[top.level - 1].name, () => find(top.nick)]);
       if (newest) items.push(["🏗", "Новые земли", "Здесь строятся самые свежие дома", () => find(newest.nick)]);
       if (island.empty && island.empty.length) items.push(["🚧", "Пустые участки", `${island.empty.length} мест ждут подписчиков без коммента`, () => { const e = island.empty[0]; flyTo(e.clone().add(V(0, 1, 0)), e.clone().add(V(10, 12, 14))); }]);
-      if (kzIsle) items.push(["🇰🇿", "Остров Казахстана", `Первый остров страны — ${fmt(kzIsle.houses.size)} подписчиков, голосовавших за Казахстан`, () => { const a = kzIsle.at, R = kzIsle.radius; flyTo(a.clone().add(V(0, 12, 0)), a.clone().add(V(R * 0.35, R * 0.55 + 16, R * 1.35))); }]);
+      isles.forEach((isle) => {
+        const c = COUNTRIES[isle.key];
+        items.push([c.emoji, "Остров " + c.of, `${c.note} — ${fmt(isle.houses.size)} подписчиков, голосовавших за ${c.name}`, () => { const a = isle.at, R = isle.radius; flyTo(a.clone().add(V(0, 12, 0)), a.clone().add(V(R * 0.35, R * 0.55 + 16, R * 1.35))); }]);
+      });
       items.push(["🏝", "Весь остров", "Вид сверху", () => { const R = island.radius; flyTo(V(0, 2, 0), V(R * 0.9, R * 0.95 + 10, R * 1.25)); }]);
       const box = $("tourList");
       box.innerHTML = "";
@@ -690,16 +714,17 @@
     }
     const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
     $("tTours").onclick = () => { tours(); openDrawer("tours"); };
-    // one tap between the main island and the Kazakh one, both seen from above
-    let onKz = false;
+    // one tap walks main island → each country island → main again, all seen from above
+    let onIsle = -1;
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
     function viewMain(dur) { const R = island.radius, tall = innerWidth < innerHeight; flyTo(V3(0, 2, 0), tall ? V3(R * 0.2, R * 1.55 + 8, R * 0.95) : V3(R * 0.9, R * 0.95 + 10, R * 1.25), dur); }
-    function viewKz() { const a = kzIsle.at, R = kzIsle.radius; flyTo(a.clone().add(V3(0, 2, 0)), a.clone().add(V3(R * 0.3, R * 1.3 + 10, R * 0.7))); }
+    function viewIsle(isle) { const a = isle.at, R = isle.radius; flyTo(a.clone().add(V3(0, 2, 0)), a.clone().add(V3(R * 0.3, R * 1.3 + 10, R * 0.7))); }
     $("tIsle").onclick = () => {
-      if (!kzIsle) return;
-      onKz = !onKz;
-      onKz ? viewKz() : viewMain();
-      $("tIsle").innerHTML = onKz ? "<span>🏝</span>Главный остров" : "<span>🇰🇿</span>Казахстан";
+      if (!isles.length) return;
+      onIsle = onIsle + 1 >= isles.length ? -1 : onIsle + 1;
+      onIsle < 0 ? viewMain() : viewIsle(isles[onIsle]);
+      const next = isles[onIsle + 1];
+      $("tIsle").innerHTML = next ? `<span>${COUNTRIES[next.key].emoji}</span>${COUNTRIES[next.key].name}` : "<span>🏝</span>Главный остров";
     };
     $("goal").onclick = () => openDrawer("goals");
 
