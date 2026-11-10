@@ -34,6 +34,7 @@
     .tag {
       position: absolute; left: 0; top: 0; padding: 3px 8px 4px; border-radius: 10px; background: rgba(255, 255, 255, 0.94);
       color: #0b3954; font-size: 11px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 rgba(11, 57, 84, 0.25); will-change: transform;
+      pointer-events: auto; cursor: pointer;   /* tap a nick: its resident card opens */
     }
     .tag.me { background: var(--accent); color: var(--accent-ink); font-size: 14px; padding: 5px 12px 6px; z-index: 2; }
     .tag.home { background: var(--accent); color: var(--accent-ink); }
@@ -511,7 +512,7 @@
         if (placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) return;
         placed.push(box);
         const el = tag(used++);
-        if (el.textContent !== "@" + h.nick) el.textContent = "@" + h.nick;
+        if (el.textContent !== "@" + h.nick) { el.textContent = "@" + h.nick; el.dataset.nick = h.nick; }
         el.classList.toggle("me", me);
         el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(2)})`;
         el.style.display = "";
@@ -610,6 +611,7 @@
     document.addEventListener("click", (e) => { if (!e.target.closest(".search")) sug.style.display = "none"; });
 
     const sheet = $("sheet");
+    labelsEl.addEventListener("click", (e) => { const t = e.target.closest(".tag"); if (t && t.dataset.nick) find(t.dataset.nick); });
     function find(nick) {
       if (!nick) return;
       sug.style.display = "none";
