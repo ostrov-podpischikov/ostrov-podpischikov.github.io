@@ -6,7 +6,7 @@
   не подписчик              → «подпишись — и получишь дом» (без номера);
   голос в опросе          → «голос за … засчитан»;
   пожелание (флаг, лодка) → «добавим к дому №…»;
-  повторный коммент       → короткое «привет, сосед».
+  повторный коммент без голоса и пожелания → без ответа (чтобы не выглядело спамом).
 Подписан ли человек, API Instagram не сообщает, поэтому в приветствии просьба подписаться
 звучит как «если ещё не подписан».
 
@@ -46,8 +46,8 @@ from build_map import WISHES, find_business  # noqa: E402  the same wish and bus
 OWN = "ostrov.podpischikov"
 MAX_PER_RUN = 8
 MAX_PER_HOUR = 30
-MAX_PER_DAY = 250
-PER_NICK_HOURS = 12
+MAX_PER_DAY = 150
+PER_NICK_HOURS = 24
 MAX_AGE_DAYS = 7
 PAUSE_HOURS = 6
 GAP_SECONDS = (15, 45)  # random pause between two replies
@@ -55,11 +55,11 @@ GAP_SECONDS = (15, 45)  # random pause between two replies
 # rule since 2026-11-07: every follower has a house; a comment levels it up.
 # Followers (on the map) hear their house number; everyone else is told that a follow = a house.
 WELCOME = [
-    "@{nick}, твой дом №{no} уже на острове 🏝 Коммент засчитан — дом подрос. Ищи его по ссылке в шапке",
-    "@{nick}, привет, житель №{no}! 🛖 Каждый новый коммент под рилсом — +1 уровень дома",
+    "@{nick}, твой дом №{no} уже на острове 🏝 Ищи его по ссылке в шапке",
+    "@{nick}, привет, житель №{no}! 🛖 Коммент под новым рилсом — +1 уровень дома",
     "@{nick}, дом №{no} стоит и ждёт тебя 🌴 Найди его на сайте — ссылка в шапке",
-    "@{nick}, ты житель №{no} 🔥 Отметь друга @ником в комменте — будете соседями, а твой дом вырастет на уровень",
-    "@{nick}, дом №{no} построен 🏝 Хочешь домик побольше? Отметь друга @ником — +1 уровень за каждого",
+    "@{nick}, ты житель №{no} 🔥 Отметь друга @ником в комменте — будете соседями, а дом получит +1 уровень",
+    "@{nick}, дом №{no} построен 🏝 Хочешь домик побольше? Отметь друга @ником — +1 уровень за каждого (до трёх)",
 ]
 WELCOME_VOTE = [
     "@{nick}, +3 очка за «{opt}» — ты подписчик 🗳 А твой дом №{no} уже на острове — ссылка в шапке",
@@ -94,7 +94,7 @@ VOTE = [
     "@{nick}, принято! «{opt}» 🗳 Зови друзей голосовать",
 ]
 WISH = [
-    "@{nick}, к дому №{no} добавим {wish} 🛠 Через 15 минут — на сайте",
+    "@{nick}, к дому №{no} добавим {wish} 🛠 Скоро появится на сайте",
     "@{nick}, записали: {wish} для дома №{no} ✍️",
     "@{nick}, легко! Добавим {wish} к дому №{no} 🏝",
 ]
@@ -107,9 +107,9 @@ AGAIN = [
     "@{nick}, ❤️ остров растёт благодаря тебе, житель №{no}",
 ]
 BIZ_REPLY = [
-    "@{nick}, открываем {biz} на участке №{no} 🏪 Через 15 минут вывеска будет на острове",
-    "@{nick}, {biz} — принято! Строим на участке №{no} 🛠 Ищи вывеску на сайте",
-    "@{nick}, у острова новый бизнес: {biz} на участке №{no} 🏝 Хочешь своё название — напиши его в кавычках",
+    "@{nick}, открываем {biz} у дома №{no} 🏪 Скоро вывеска появится на острове",
+    "@{nick}, {biz} — принято! Строим у дома №{no} 🛠 Ищи вывеску на сайте",
+    "@{nick}, у острова новый бизнес: {biz} у дома №{no} 🏝 Хочешь своё название — напиши его в кавычках",
 ]
 BIZ_TITLES = {"shop": "магазин", "cafe": "кафе", "shawarma": "шаурму", "pizza": "пиццерию", "sushi": "суши-бар", "burger": "бургерную",
               "icecream": "киоск мороженого", "bar": "пляжный бар", "fish": "рыбную лавку", "hotel": "отель", "cinema": "кинотеатр",
@@ -233,7 +233,13 @@ def main():
         if st["nicks"].get(nick, "") > cooldown:
             continue  # answered this person recently; their new comments wait
         target = cs[-1]  # answer the latest one, the earlier ones count as covered
-        queue.append((target, [c["id"] for c in cs[:-1]]))
+        ids = [c["id"] for c in cs]
+        if nick in st["nicks"] and (on_map is None or nick in on_map) and residents[nick].get("cid") != target["id"]:
+            t = target.get("text", "")
+            if not (find_vote(t, polls, target["time"]) or find_wish(t) or find_business(t)):
+                st["done"] += ids  # a repeat «hi» from someone we already greeted: no reply, it would only look like spam
+                continue
+        queue.append((target, ids[:-1]))
     queue.sort(key=lambda q: q[0]["time"], reverse=True)  # fresh comments first
 
     st["sent"] = [t for t in st["sent"] if t > iso(now - timedelta(days=1))]
