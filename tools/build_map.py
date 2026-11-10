@@ -94,7 +94,8 @@ def wishes_by_nick():
 
 
 OWN = {"ostrov.podpischikov"}
-FRIENDS_MAX, REELS_MAX = 3, 2
+FRIENDS_MAX, REELS_MAX = 5, 4   # 10.11: levels go up to 10 (Усадьба, Дворец, Замок)
+MAX_LEVEL = 10
 
 
 def quest_levels(nicks):
@@ -280,7 +281,7 @@ def main():
         if fr:
             residents[nick]["fr"] = fr
     for r in residents.values():
-        r["level"] = max(1, min(7, r["level"]))
+        r["level"] = max(1, min(MAX_LEVEL, r["level"]))
 
     # follow status comes from direct messages (dm_follow.py): only «not following» goes to the map — a sign on the house
     follows_file = HERE / "follows.json"
