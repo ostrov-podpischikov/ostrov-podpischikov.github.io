@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=15"></script>
+  <script src="island.js?v=16"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -148,6 +148,9 @@
     }
 
     #loading { position: fixed; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 18px; z-index: 20; background: var(--sky); color: #0b3954; }
+    /* while the houses are still being built: a small pill instead of the full screen */
+    #loading.mini { inset: auto; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 12px; font-size: 13px; background: rgba(255, 255, 255, 0.92); z-index: 6; pointer-events: none; }
+    @media (max-width: 600px) { #loading.mini { bottom: calc(118px + env(safe-area-inset-bottom)); font-size: 12px; } }
   </style>
 </head>
 <body>
@@ -304,6 +307,15 @@
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.fov = w < h ? 60 : 45;
+      // the panels cover the top (and on phones the bottom) of the screen: centre the 3D view in the free part between them
+      let top = 0, bottom = h;
+      document.querySelectorAll("header > .panel, header > .tools").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (!r.height || getComputedStyle(el).display === "none") return;
+        if (r.top < h / 2) top = Math.max(top, r.bottom); else bottom = Math.min(bottom, r.top);
+      });
+      const dy = Math.max(0, Math.min(h * 0.25, (top + bottom) / 2 - h / 2));
+      if (dy > 2) camera.setViewOffset(w, h, 0, -dy, w, h); else camera.clearViewOffset();
       camera.updateProjectionMatrix();
     }
     window.addEventListener("resize", resize);
@@ -350,12 +362,14 @@
       const local = (rows) => rows.map((r, k) => ({ ...r, gno: r.no, no: k + 2 }));
       const home = list.filter((r) => !COUNTRIES[r.c]);
       // empty plots for followers without a comment, only on today's full island
-      island = OstrovIsland.build(THREE, local(home), { emptyPlots: list === residents ? emptyPlots : 0 });
+      // the full list builds its houses a few at a time (see buildStep in loop), so the page never freezes
+      const progressive = list === residents && list.length > 1500;
+      island = OstrovIsland.build(THREE, local(home), { emptyPlots: list === residents ? emptyPlots : 0, progressive });
       scene.add(island.group);
       Object.entries(COUNTRIES).forEach(([key, info]) => {
         const rows = list.filter((r) => r.c === key);
         if (!rows.length) return;
-        const isle = OstrovIsland.build(THREE, local(rows), { country: key });
+        const isle = OstrovIsland.build(THREE, local(rows), { country: key, progressive });
         const d = island.radius + isle.radius + 22, at = new THREE.Vector3(d * info.dir[0], 0, d * info.dir[1]);
         isle.group.position.copy(at);
         isle.at = at;
@@ -365,7 +379,34 @@
         isle.houses.forEach((h, n) => { h.pos.add(at); h.top.add(at); island.houses.set(n, h); });
         isles.push(isle);
       });
+      building = progressive ? [island, ...isles] : [];
+      if (!progressive && $("loading") && $("loading").classList.contains("mini")) $("loading").remove();
+      lastView = "";
       renderer.shadowMap.needsUpdate = true;
+    }
+    // houses still to draw: ~10 ms a frame, the main island first, then the country islands
+    let building = [], builtFrames = 0, lastBuild = 0;
+    function buildStep() {
+      if (!building.length) return;
+      // ~60% of the time between frames: 10 ms at 60 fps, more when the browser draws rarely (background tab, slow phone)
+      const now = performance.now(), gap = lastBuild ? now - lastBuild : 16;
+      lastBuild = now;
+      const total = building.reduce((s, x) => s + x.jobs, 0) || 1;
+      let doneN = 0, left = Math.min(250, Math.max(10, gap * 0.6));
+      for (const x of building) {
+        const t0 = performance.now(), f = x.step(Math.max(0, left));
+        left -= performance.now() - t0;
+        doneN += f * x.jobs;
+      }
+      const el = $("loading");
+      if (doneN >= total - 0.5) {
+        building = [];
+        if (el) el.remove();
+        renderer.shadowMap.needsUpdate = true;
+        return;
+      }
+      if (el) el.textContent = `🏗 Строим дома… ${Math.floor((doneN / total) * 100)}%`;
+      if (++builtFrames % 20 === 0) renderer.shadowMap.needsUpdate = true;
     }
     // GitHub Pages is often slow to serve the big list; raw.githubusercontent is the same file and much faster,
     // so try it first (5 s) and fall back to the site copy
@@ -404,7 +445,9 @@
         viewMain(0);
         $("tIsle").style.display = isles.length ? "" : "none";
         if (isles.length) $("tIsle").innerHTML = `<span>${COUNTRIES[isles[0].key].emoji}</span>${COUNTRIES[isles[0].key].name}`;
-        $("loading").remove();
+        if (building.length) { $("loading").classList.add("mini"); $("loading").textContent = "🏗 Строим дома… 0%"; }
+        else $("loading").remove();
+        resize();   // the panels have their real height now
         const fromLink = norm(new URLSearchParams(location.search).get("nick") || decodeURIComponent(location.hash.slice(1)));
         if (fromLink) {
           find(fromLink);
@@ -439,8 +482,13 @@
       return pool[i];
     }
     const v = new THREE.Vector3();
+    // sorting 14 000 houses by distance every frame was the main cost on a still view: redo it only when the view moves
+    let lastView = "";
     function drawLabels() {
       if (!island) return;
+      const e = camera.matrixWorld.elements, key = e.map((x) => x.toFixed(2)).join() + selected + innerWidth + "x" + innerHeight;
+      if (key === lastView) return;
+      lastView = key;
       const maxTags = window.innerWidth < 600 ? 22 : 45;
       const list = [];
       // a business already shows the nick on its sign board, so it gets no floating tag unless selected
@@ -500,6 +548,7 @@
         if (k >= 1) flight = null;
       }
       controls.update();
+      buildStep();
       fitShadow();
       // near plane follows the zoom: far views get a deeper near plane, so phones (coarser depth buffers) stop
       // flickering between the ground, the plots and the streets, which lie only centimetres apart
