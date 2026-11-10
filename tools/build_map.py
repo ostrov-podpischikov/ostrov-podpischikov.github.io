@@ -187,7 +187,8 @@ def tally_polls():
     return out
 
 
-COUNTRY_ISLANDS = {"island": ["kz"]}   # poll id → countries that already have their own island
+# poll id → countries that got their own island; "winner" = the poll's top option, only once the poll has closed
+COUNTRY_ISLANDS = {"island": ["kz"], "island2": "winner"}
 
 
 def island_country():
@@ -196,11 +197,22 @@ def island_country():
     if not cfg_file.exists() or not com_file.exists():
         return {}
     polls = {p["id"]: p for p in json.loads(cfg_file.read_text(encoding="utf-8"))}
-    out = {}
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+    tallies = None
+    result = {}
     for pid, keys in COUNTRY_ISLANDS.items():
         p = polls.get(pid)
         if not p:
             continue
+        if keys == "winner":
+            if not p.get("until") or now < p["until"][:16]:
+                continue  # still open: nobody moves before the final count
+            tallies = tallies if tallies is not None else {t["id"]: t for t in tally_polls()}
+            opts = tallies.get(pid, {}).get("options", [])
+            if not opts or not sum(o["votes"] for o in opts):
+                continue
+            keys = [max(opts, key=lambda o: o["votes"])["key"]]
+        out = {}
         since, reel_since, until = p.get("since", ""), p.get("reel_since", ""), p.get("until", "")
         for c in sorted(json.loads(com_file.read_text(encoding="utf-8")), key=lambda c: c["time"]):
             if c["time"][:len(since)] < since or (until and c["time"][:len(until)] >= until):
@@ -214,8 +226,9 @@ def island_country():
                         or (o.get("emoji") and o["emoji"] in c.get("text", ""))), None)
             if hit and c.get("username"):
                 out[c["username"]] = hit
-        out = {n: k for n, k in out.items() if k in keys}
-    return out
+        # a later island poll wins only for those who voted its winning country there
+        result.update({n: k for n, k in out.items() if k in keys})
+    return result
 
 
 def main():
