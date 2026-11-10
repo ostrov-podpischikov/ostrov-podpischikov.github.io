@@ -681,7 +681,7 @@
     });
 
     // houses; with opts.perHouse every house is its own mesh (origin at its plot) so videos can animate them
-    const named = [];
+    const named = [], jobs = [];
     rows.forEach((r, k) => {
       const [i, j, d] = cells[k];
       const x = i * PLOT, z = j * PLOT, y = 2;
@@ -715,7 +715,7 @@
           bb.around();
         });
       };
-      const y0 = (bb) => (bb === b ? y : 0);
+      const y0 = () => (opts.perHouse ? 0 : y);
       let mesh = null, signHost = group, sx = x, sy = y, sz = z;
       if (opts.perHouse) {
         const hb = new Builder(THREE);
@@ -724,7 +724,7 @@
         mesh.position.set(x, y, z);
         group.add(mesh);
         signHost = mesh; sx = 0; sy = 0; sz = 0;
-      } else draw(b, x, z);
+      } else jobs.push([x, z, draw]);   // drawn later by step(), in chunks of their own
       let bizInfo = null;
       if (biz) {
         const label = r.brand ? "«" + r.brand + "»" : "@" + r.nick;
@@ -826,6 +826,24 @@
     b.box(4.6, 0.3, pz + 6, 1.1, 0.5, 2.8, "#9C6B3C").box(4.6, 0.6, pz + 6, 0.8, 0.12, 2.4, "#C79A62").box(4.6, 1.4, pz + 6, 0.1, 1.6, 0.1, C.log2).box(4.6, 1.5, pz + 6.4, 0.05, 1.1, 0.8, "#FFFFFF");
     group.add(b.mesh());
 
+    // the houses themselves: one mesh per CHUNK houses in plot order (the town grows ring by ring from the plaza),
+    // so the camera culls the chunks out of view and opts.progressive can spread the work over several frames
+    const CHUNK = 250;
+    let hb = null, done = 0;
+    const flush = () => { if (hb && hb.P) group.add(hb.mesh()); hb = null; };
+    const step = (ms) => {
+      const t0 = performance.now();
+      while (done < jobs.length && performance.now() - t0 < ms) {
+        if (!hb) hb = new Builder(THREE);
+        const [x, z, draw] = jobs[done++];
+        draw(hb, x, z);
+        if (done % CHUNK === 0) flush();
+      }
+      if (done >= jobs.length) flush();
+      return jobs.length ? done / jobs.length : 1;
+    };
+    if (!opts.progressive) step(Infinity);
+
     const sign = new THREE.Group();
     const post = new Builder(THREE);
     post.box(-1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(1.4, 1.2, 0, 0.35, 2.4, 0.35, C.log).box(0, 2.45, 0.28, 3.4, 2.5, 0.2, "#7A4F2A");
@@ -843,7 +861,8 @@
     let lighthouse = null, flagPole = null;
     if (opts.country) {
       sign.visible = false;
-      flagPole = buildCountryFlag(THREE, opts.country);
+      // big enough to read from across the strait: grows with the island (the camera backs off with it), ×2.5 to ×8
+      flagPole = buildCountryFlag(THREE, opts.country, Math.max(2.5, Math.min(8, R / 20)));
       group.add(flagPole.group);
     } else {
       // the lighthouse everyone built together (goal 500, day 5): on a rock past the pier, with a turning beam
@@ -863,7 +882,7 @@
     }
 
     const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
-    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port, flagPole };
+    return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port, flagPole, step, jobs: jobs.length };
   }
 
   function drawKZ(f) {
@@ -912,22 +931,26 @@
   const FLAG_DRAW = { kz: drawKZ, kg: drawKG, uz: drawUZ, tj: drawEmoji("🇹🇯"), am: drawEmoji("🇦🇲"), az: drawEmoji("🇦🇿"), ru: drawEmoji("🇷🇺") };
 
   // the country's big flag on the plaza of its island
-  function buildCountryFlag(THREE, key) {
-    const g = new THREE.Group();
-    const box = (x, y, z, w, h, d, col, basic) => {
+  function buildCountryFlag(THREE, key, k) {
+    const g = new THREE.Group(), up = new THREE.Group();
+    const box = (x, y, z, w, h, d, col, basic, host) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), basic ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshLambertMaterial({ color: col }));
-      m.position.set(x, y, z); g.add(m); return m;
+      m.position.set(x, y, z); (host || g).add(m); return m;
     };
     box(0, 2.3, 0, 3.4, 0.6, 3.4, "#9EA3AA"); box(0, 2.75, 0, 2.2, 0.3, 2.2, "#C9CED6");
-    box(0, 2.9 + 11, 0, 0.45, 22, 0.45, "#D8DDE3");
-    box(0, 25.2, 0, 0.9, 0.9, 0.9, "#F4D35E", true);
-    const fc = document.createElement("canvas"); fc.width = 300; fc.height = 200;
-    (FLAG_DRAW[key] || drawKZ)(fc.getContext("2d"));
+    // the pole and the cloth grow by k from the plinth top; the plinth keeps the plaza size
+    up.position.y = 2.9; up.scale.setScalar(k || 1); g.add(up);
+    box(0, 11, 0, 0.45, 22, 0.45, "#D8DDE3", false, up);
+    box(0, 22.3, 0, 0.9, 0.9, 0.9, "#F4D35E", true, up);
+    // drawn at 2× so the big flag stays sharp
+    const fc = document.createElement("canvas"); fc.width = 600; fc.height = 400;
+    const fx = fc.getContext("2d"); fx.scale(2, 2);
+    (FLAG_DRAW[key] || drawKZ)(fx);
     const fg = new THREE.PlaneGeometry(11.4, 7.6, 16, 1); fg.translate(5.95, 0, 0);
     const flag = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc), side: THREE.DoubleSide }));
-    flag.position.set(0.2, 20.6, 0);
+    flag.position.set(0.2, 17.7, 0);
     flag.userData.base = fg.attributes.position.array.slice();
-    g.add(flag);
+    up.add(flag);
     return { group: g, flag };
   }
 
