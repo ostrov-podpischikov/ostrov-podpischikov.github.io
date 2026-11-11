@@ -28,6 +28,11 @@
     { name: "Усадьба", emoji: "🏛" },
     { name: "Дворец", emoji: "🕌" },
     { name: "Замок", emoji: "🏰" },
+    { name: "Поместье", emoji: "🏖" },
+    { name: "Небоскрёб", emoji: "🏙" },
+    { name: "Хрустальный дворец", emoji: "💎" },
+    { name: "Золотой дворец", emoji: "✨" },
+    { name: "Королевский замок", emoji: "👑" },
   ];
   // features shown on the resident card
   const FEATURES = {
@@ -434,8 +439,68 @@
       b.box(x, y + 6.1, z - 0.4, 0.08, 1.4, 0.08, C.white).box(x + 0.4, y + 6.5, z - 0.4, 0.75, 0.45, 0.04, v.flag);
       b.box(x, y + 0.75, z + 1.21, 0.9, 1.5, 0.06, C.door).box(x, y + 1.55, z + 1.21, 1.1, 0.14, 0.08, C.log2);
     },
+    // 11 — Поместье: a modern white villa, glass upper floor, wood slats, an infinity pool
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.8, z - 0.2, 3.6, 1.6, 2.6, C.white);
+      b.box(x - 0.4, y + 0.8, z + 1.12, 2.2, 1.2, 0.06, C.glass).box(x + 1.2, y + 0.7, z + 1.12, 0.6, 1.4, 0.06, C.door);
+      b.box(x, y + 1.65, z - 0.2, 3.8, 0.1, 2.8, v.roof);
+      b.box(x + 0.3, y + 2.4, z - 0.4, 2.8, 1.4, 2.0, C.glass, "#7FC8E8").box(x + 0.3, y + 3.15, z - 0.4, 3.0, 0.12, 2.2, C.white);
+      b.box(x - 0.6, y + 1.9, z + 1.05, 2.4, 0.3, 0.04, C.glass);
+      for (let i = 0; i < 5; i++) b.box(x - 1.82, y + 0.8, z - 1.2 + i * 0.5, 0.06, 1.5, 0.2, C.plank);
+      b.box(x, y + 0.06, z + 1.75, 3.2, 0.12, 0.7, C.white).box(x, y + 0.14, z + 1.75, 2.9, 0.04, 0.5, C.pool, C.pool);
+    },
+    // 12 — Небоскрёб: a glass tower on a podium, coloured bands, a spire with a red light
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.6, z, 3.0, 1.2, 2.6, C.white).box(x, y + 0.6, z + 1.31, 2.4, 0.9, 0.04, C.glass);
+      for (let i = 0; i < 10; i++) {
+        b.box(x, y + 1.6 + i * 0.8, z - 0.1, 1.8, 0.7, 1.8, C.glass, "#6FB7DA");
+        b.box(x, y + 1.98 + i * 0.8, z - 0.1, 1.86, 0.1, 1.86, i % 3 === 2 ? v.roof : C.metal);
+      }
+      b.box(x, y + 9.7, z - 0.1, 1.4, 0.4, 1.4, v.roof).box(x, y + 10.2, z - 0.1, 0.08, 0.8, 0.08, C.metal).box(x, y + 10.65, z - 0.1, 0.16, 0.16, 0.16, C.red, C.red);
+    },
+    // 13 — Хрустальный дворец: white colonnade, a stepped glass dome, golden trim
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.15, z - 0.1, 3.8, 0.3, 3.0, C.white).box(x, y + 1.1, z - 0.1, 3.4, 1.6, 2.6, C.white);
+      b.box(x, y + 1.1, z + 1.2, 3.2, 1.2, 0.04, C.glass);
+      for (let i = -3; i <= 3; i++) b.box(x + i * 0.5, y + 1.1, z + 1.24, 0.16, 1.6, 0.16, C.cream);
+      b.box(x, y + 1.98, z - 0.1, 3.6, 0.16, 2.8, C.gold);
+      [2.4, 2.0, 1.6, 1.1, 0.6].forEach((s, i) => b.box(x, y + 2.3 + i * 0.45, z - 0.1, s, 0.45, s * 0.85, C.glass, "#8FD8F0"));
+      b.box(x, y + 4.6, z - 0.1, 0.2, 0.5, 0.2, C.gold);
+      [-1.6, 1.6].forEach((dx) => b.box(x + dx, y + 2.4, z + 0.9, 0.5, 0.6, 0.5, C.glass).box(x + dx, y + 2.85, z + 0.9, 0.3, 0.3, 0.3, C.gold));
+    },
+    // 14 — Золотой дворец: three domes, two minarets, a golden gate and a pool
+    (b, x, y, z, v) => {
+      b.box(x, y + 1.0, z - 0.2, 3.6, 2.0, 2.6, C.white, "#EDE6D6").box(x, y + 2.06, z - 0.2, 3.8, 0.14, 2.8, C.gold);
+      [1.6, 1.3, 1.0, 0.6, 0.3].forEach((s, i) => b.box(x, y + 2.35 + i * 0.38, z - 0.2, s, 0.38, s, C.gold));
+      b.box(x, y + 4.4, z - 0.2, 0.08, 0.6, 0.08, C.gold);
+      [-1.2, 1.2].forEach((dx) => [0.8, 0.55, 0.3].forEach((s, i) => b.box(x + dx, y + 2.3 + i * 0.3, z - 0.2, s, 0.3, s, v.roof)));
+      [-1.7, 1.7].forEach((dx) => {
+        b.box(x + dx, y + 2.4, z + 1.1, 0.45, 4.8, 0.45, C.white).box(x + dx, y + 4.4, z + 1.1, 0.65, 0.15, 0.65, C.gold);
+        [0.4, 0.25].forEach((s, i) => b.box(x + dx, y + 5.0 + i * 0.3, z + 1.1, s, 0.3, s, C.gold));
+      });
+      b.box(x, y + 0.9, z + 1.11, 1.0, 1.8, 0.06, C.gold).box(x, y + 0.8, z + 1.13, 0.7, 1.5, 0.04, C.door);
+      [-1.0, 1.0].forEach((dx) => b.box(x + dx, y + 1.2, z + 1.11, 0.4, 0.8, 0.06, C.glass));
+      b.box(x, y + 0.06, z + 1.75, 2.4, 0.12, 0.6, C.gold).box(x, y + 0.14, z + 1.75, 2.1, 0.04, 0.4, C.pool, C.pool);
+    },
+    // 15 — Королевский замок: white and gold, four towers, a tall keep with a golden crown and the owner's flag
+    (b, x, y, z, v) => {
+      b.box(x, y + 0.9, z - 0.2, 3.8, 1.8, 3.0, C.white, "#E6E1D6");
+      for (let i = -3; i <= 3; i++) b.box(x + i * 0.55, y + 1.95, z + 1.25, 0.3, 0.3, 0.3, C.white);
+      [[-1.7, 1.2], [1.7, 1.2], [-1.7, -1.6], [1.7, -1.6]].forEach(([dx, dz]) => {
+        b.box(x + dx, y + 1.8, z + dz, 0.95, 3.6, 0.95, C.white, "#E6E1D6").box(x + dx, y + 3.7, z + dz, 1.1, 0.25, 1.1, C.gold);
+        [0.8, 0.55, 0.3].forEach((s, i) => b.box(x + dx, y + 4.0 + i * 0.38, z + dz, s, 0.38, s, v.roof));
+        b.box(x + dx, y + 5.25, z + dz, 0.12, 0.25, 0.12, C.gold);
+      });
+      b.box(x, y + 2.4, z - 0.4, 2.2, 2.6, 2.0, C.white, "#E6E1D6").box(x, y + 3.75, z - 0.4, 2.4, 0.2, 2.2, C.gold);
+      b.box(x, y + 5.0, z - 0.4, 1.3, 2.3, 1.3, C.white, "#E6E1D6").box(x, y + 6.25, z - 0.4, 1.5, 0.25, 1.5, C.gold);
+      [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6], [0, 0.6], [0, -0.6], [0.6, 0], [-0.6, 0]].forEach(([a, c]) => b.box(x + a, y + 6.55, z - 0.4 + c, 0.22, 0.4, 0.22, C.gold));
+      b.box(x, y + 7.0, z - 0.4, 0.1, 1.2, 0.1, C.white).box(x + 0.4, y + 7.35, z - 0.4, 0.75, 0.45, 0.04, v.flag);
+      b.box(x, y + 0.75, z + 1.31, 1.0, 1.5, 0.06, C.gold).box(x, y + 0.7, z + 1.33, 0.75, 1.3, 0.04, C.door);
+      [-0.9, 0.9].forEach((dx) => b.box(x + dx, y + 1.1, z + 1.31, 0.35, 0.6, 0.04, C.glass));
+      b.box(x, y + 3.3, z + 0.61, 0.4, 0.6, 0.04, C.glass).box(x, y + 5.2, z + 0.26, 0.35, 0.6, 0.04, C.glass);
+    },
   ];
-  const HEIGHT = [2.6, 2.6, 3.0, 3.3, 4.2, 3.4, 8.6, 4.9, 5.7, 7.0];
+  const HEIGHT = [2.6, 2.6, 3.0, 3.3, 4.2, 3.4, 8.6, 4.9, 5.7, 7.0, 3.3, 10.8, 4.9, 5.6, 7.9];
   const MAX_LEVEL = MODELS.length;
 
   // ── businesses: a resident who asked for one in a comment gets it instead of a hut.
