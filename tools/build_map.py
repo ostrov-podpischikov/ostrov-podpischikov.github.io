@@ -94,8 +94,8 @@ def wishes_by_nick():
 
 
 OWN = {"ostrov.podpischikov"}
-FRIENDS_MAX, REELS_MAX = 5, 4   # 10.11: levels go up to 10 (Усадьба, Дворец, Замок)
-MAX_LEVEL = 10
+FRIENDS_MAX, REELS_MAX = 7, 6   # 11.11: levels go up to 15 (… Замок, Поместье, Небоскрёб, Хрустальный/Золотой дворец, Королевский замок)
+MAX_LEVEL = 15
 
 
 def quest_levels(nicks):
