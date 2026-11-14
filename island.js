@@ -995,8 +995,11 @@
     if (opts.country) {
       sign.visible = false;
       // big enough to read from across the strait: grows with the island (the camera backs off with it), ×2.5 to ×8
-      flagPole = buildCountryFlag(THREE, opts.country, Math.max(2.5, Math.min(8, R / 20)));
-      group.add(flagPole.group);
+      if (opts.country === "ronaldo") group.add(buildStadium(THREE));   // 13.11: Ronaldo won the stadium vote
+      else {
+        flagPole = buildCountryFlag(THREE, opts.country, Math.max(2.5, Math.min(8, R / 20)));
+        group.add(flagPole.group);
+      }
     } else {
       // the lighthouse everyone built together (goal 500, day 5): on a rock past the pier, with a turning beam
       lighthouse = buildLighthouse(THREE, new THREE.Vector3(2.5, 0, pz + 14));
@@ -1062,6 +1065,54 @@
     f.font = "150px sans-serif"; f.textAlign = "center"; f.textBaseline = "middle"; f.fillText(emoji, 150, 108);
   };
   const FLAG_DRAW = { kz: drawKZ, kg: drawKG, uz: drawUZ, tj: drawEmoji("🇹🇯"), am: drawEmoji("🇦🇲"), az: drawEmoji("🇦🇿"), ru: drawEmoji("🇷🇺") };
+
+  // the Ronaldo stadium on the plaza of his fans' island: red-green stands, a pitch and a «7» board (≈36×25, plots 2–19 stay empty)
+  function buildStadium(THREE) {
+    const g = new THREE.Group(), L = 26, D = 18, HS = 5.5, RED = "#C8102E", GRN = "#046A38";
+    const box = (x, y, z, w, h, d, col, basic) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), basic ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshLambertMaterial({ color: col }));
+      m.position.set(x, y, z); g.add(m); return m;
+    };
+    const plane = (w, h, draw, cw, ch) => {
+      const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch; draw(cv.getContext("2d"), cw, ch);
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), side: THREE.DoubleSide }));
+    };
+    box(0, -1.3, 0, L + 1.2, 3.0, D + 1.2, "#8A919D");
+    box(0, 0.1, 0, L, 0.2, D, "#9AA1AD");
+    const pitch = plane(L - 6, D - 6, (c, w, h) => {
+      for (let i = 0; i < 10; i++) { c.fillStyle = i % 2 ? "#3FA34D" : "#4CB85A"; c.fillRect((i * w) / 10, 0, w / 10 + 1, h); }
+      c.strokeStyle = "#FFFFFF"; c.lineWidth = 6; c.strokeRect(10, 10, w - 20, h - 20);
+      c.beginPath(); c.moveTo(w / 2, 10); c.lineTo(w / 2, h - 10); c.stroke();
+      c.beginPath(); c.arc(w / 2, h / 2, h * 0.16, 0, Math.PI * 2); c.stroke();
+      c.strokeRect(10, h * 0.28, w * 0.13, h * 0.44); c.strokeRect(w - 10 - w * 0.13, h * 0.28, w * 0.13, h * 0.44);
+    }, 600, 400);
+    pitch.rotation.x = -Math.PI / 2; pitch.position.y = 0.25; g.add(pitch);
+    for (let s = 0; s < 3; s++) {
+      const y = 0.9 + s * 1.5, inset = 3 - s * 0.9, tw = 1.1, a = s % 2 ? GRN : RED, b = s % 2 ? RED : GRN;
+      box(0, y, -(D / 2 - inset), L - 2 * inset + 2 * tw, 1.5, tw, a);
+      box(0, y, D / 2 - inset, L - 2 * inset + 2 * tw, 1.5, tw, a);
+      box(-(L / 2 - inset), y, 0, tw, 1.5, D - 2 * inset, b);
+      box(L / 2 - inset, y, 0, tw, 1.5, D - 2 * inset, b);
+    }
+    box(0, HS, -(D / 2 + 0.2), L + 1, 0.5, 1.6, "#F4F4F4");
+    box(0, HS, D / 2 + 0.2, L + 1, 0.5, 1.6, "#F4F4F4");
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+      box(sx * (L / 2 + 0.6), 4.5, sz * (D / 2 + 0.6), 0.4, 9, 0.4, "#D8DDE3");
+      box(sx * (L / 2 + 0.6), 9.2, sz * (D / 2 + 0.6), 2.2, 1.2, 0.5, "#FFF7C2", true);
+    });
+    const board = plane(14, 6, (c, w, h) => {
+      c.fillStyle = RED; c.fillRect(0, 0, w / 2, h); c.fillStyle = GRN; c.fillRect(w / 2, 0, w / 2, h);
+      c.fillStyle = "#FFFFFF"; c.textAlign = "center"; c.textBaseline = "middle"; c.lineWidth = 12; c.strokeStyle = "#0B0B0B";
+      c.font = "900 210px Montserrat, sans-serif"; c.strokeText("7", w / 2, h * 0.42); c.fillText("7", w / 2, h * 0.42);
+      c.font = "900 62px Montserrat, \"Arial Black\", Arial, sans-serif"; c.strokeText("СТАДИОН РОНАЛДУ", w / 2, h * 0.86); c.fillText("СТАДИОН РОНАЛДУ", w / 2, h * 0.86);
+    }, 840, 360);
+    board.position.set(0, HS + 3.6, -(D / 2 + 0.3)); g.add(board);
+    box(-7.3, HS + 1.2, -(D / 2 + 0.4), 0.4, 3, 0.4, "#555C66");
+    box(7.3, HS + 1.2, -(D / 2 + 0.4), 0.4, 3, 0.4, "#555C66");
+    g.scale.set(1.4, 1, 1.4);
+    g.position.y = 4.85;
+    return g;
+  }
 
   // the country's big flag on the plaza of its island
   function buildCountryFlag(THREE, key, k) {
