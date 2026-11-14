@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=19"></script>
+  <script src="island.js?v=20"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -351,6 +351,8 @@
       kg: { emoji: "🇰🇬", name: "Кыргызстан", of: "Кыргызстана", dir: [0.3, 0.95], note: "Второй остров страны" },
       uz: { emoji: "🇺🇿", name: "Узбекистан", of: "Узбекистана", dir: [0.3, 0.95], note: "Второй остров страны" },
       tj: { emoji: "🇹🇯", name: "Таджикистан", of: "Таджикистана", dir: [0.3, 0.95], note: "Второй остров страны" },
+      // 13.11: «Роналду или Месси» — fans of the winner live around his stadium; skip = plots under the stadium
+      ronaldo: { emoji: "⚽", name: "Роналду", of: "Роналду", dir: [-0.9, 0.45], note: "Остров фанатов со стадионом", skip: 18 },
     };
     const isleName = (key) => (COUNTRIES[key] ? `${COUNTRIES[key].emoji} Остров ${COUNTRIES[key].of}` : null);
     let island, residents = [], emptyPlots = 0, isles = [];
@@ -362,7 +364,7 @@
       });
       isles = [];
       // followers who voted for a winning country live on its island (field c); each island numbers its own plots, the card keeps the real №
-      const local = (rows) => rows.map((r, k) => ({ ...r, gno: r.no, no: k + 2 }));
+      const local = (rows, skip) => rows.map((r, k) => ({ ...r, gno: r.no, no: k + 2 + (skip || 0) }));
       const home = list.filter((r) => !COUNTRIES[r.c]);
       // empty plots for followers without a comment, only on today's full island
       // the full list builds its houses a few at a time (see buildStep in loop), so the page never freezes
@@ -372,7 +374,7 @@
       Object.entries(COUNTRIES).forEach(([key, info]) => {
         const rows = list.filter((r) => r.c === key);
         if (!rows.length) return;
-        const isle = OstrovIsland.build(THREE, local(rows), { country: key, progressive });
+        const isle = OstrovIsland.build(THREE, local(rows, info.skip), { country: key, progressive });
         const d = island.radius + isle.radius + 22, at = new THREE.Vector3(d * info.dir[0], 0, d * info.dir[1]);
         isle.group.position.copy(at);
         isle.at = at;
