@@ -35,8 +35,10 @@
       position: absolute; left: 0; top: 0; padding: 3px 8px 4px; border-radius: 10px; background: rgba(255, 255, 255, 0.94);
       color: #0b3954; font-size: 11px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 rgba(11, 57, 84, 0.25); will-change: transform;
       pointer-events: auto; cursor: pointer;   /* tap a nick: its resident card opens */
+      opacity: 0.88;
     }
-    .tag.me { background: var(--accent); color: var(--accent-ink); font-size: 14px; padding: 5px 12px 6px; z-index: 2; }
+    @media (max-width: 600px) { .tag { font-size: 10px; padding: 2px 7px 3px; } }
+    .tag.me { background: var(--accent); color: var(--accent-ink); font-size: 14px; padding: 5px 12px 6px; z-index: 2; opacity: 1; }
     .tag.home { background: var(--accent); color: var(--accent-ink); }
 
     header { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); z-index: 5; display: grid; gap: 8px; }
@@ -317,7 +319,8 @@
         if (r.top < h / 2) top = Math.max(top, r.bottom); else bottom = Math.min(bottom, r.top);
       });
       freeTop = top; freeBottom = bottom;
-      const dy = Math.max(0, Math.min(h * 0.25, (top + bottom) / 2 - h / 2));
+      // only half the shift: the full one pushed the island to the bottom edge and left the top as empty sky
+      const dy = Math.max(0, Math.min(h * 0.15, ((top + bottom) / 2 - h / 2) * 0.5));
       if (dy > 2) camera.setViewOffset(w, h, 0, -dy, w, h); else camera.clearViewOffset();
       camera.updateProjectionMatrix();
     }
@@ -386,7 +389,7 @@
       });
       building = progressive ? [island, ...isles] : [];
       if (!progressive && $("loading") && $("loading").classList.contains("mini")) $("loading").remove();
-      lastView = "";
+      lastView = ""; chosen = [];
       renderer.shadowMap.needsUpdate = true;
     }
     // houses still to draw: ~10 ms a frame, the main island first, then the country islands
@@ -488,13 +491,21 @@
     }
     const v = new THREE.Vector3();
     // sorting 14 000 houses by distance every frame was the main cost on a still view: redo it only when the view moves
-    let lastView = "";
+    // while the view moves the same nicks only follow their houses; a new set is picked once it rests for 250 ms —
+    // re-picking every frame made the nicks jump from house to house («ники летают»)
+    let lastView = "", lastMove = 0, picked = false, chosen = [];
+    const phone = () => window.innerWidth < 600;
     function drawLabels() {
       if (!island) return;
       const e = camera.matrixWorld.elements, key = e.map((x) => x.toFixed(2)).join() + selected + innerWidth + "x" + innerHeight;
-      if (key === lastView) return;
-      lastView = key;
-      const maxTags = window.innerWidth < 600 ? 30 : 50;
+      const now = performance.now();
+      if (key !== lastView) { lastView = key; lastMove = now; picked = false; }
+      else if (picked) return;
+      if (!picked && now - lastMove > 250) { chosen = pickTags(); picked = true; }
+      placeTags();
+    }
+    function pickTags() {
+      const maxTags = phone() ? 20 : 40;
       const farTag = Math.max(160, camera.position.distanceTo(controls.target) * 2.5);
       const list = [];
       // a business already shows the nick on its sign board, so it gets no floating tag unless selected
@@ -502,7 +513,8 @@
       // nearest houses ON SCREEN: the nearest overall sit under the bottom edge in a far view, and then no nick showed at all
       // and only the part not covered by the panels; spread over a screen grid (nearest house per cell), so a far view
       // gets nicks all over the island instead of a clump at the bottom edge
-      const W = innerWidth, Hh = innerHeight, cell = {}, cw = W < 600 ? 110 : 150, ch = 46;
+      // big cells: a few nicks spread over the view instead of a cloud of them covering the houses
+      const W = innerWidth, Hh = innerHeight, cell = {}, cw = W < 600 ? 135 : 200, ch = W < 600 ? 105 : 90;
       list.forEach((e) => {
         v.copy(e[1].top).project(camera);
         if (v.z > 1 || Math.abs(v.x) > 1) return;
@@ -512,18 +524,20 @@
         if (!cell[k] || cell[k][0] > e[0]) cell[k] = e;
       });
       const onScreen = Object.values(cell).sort((a, b) => a[0] - b[0]);
-      const show = onScreen.slice(0, maxTags * 2).map((x) => x[1]);
-      if (selected && island.houses.has(selected)) show.unshift(island.houses.get(selected));
+      // far views still show the nearest nicks: the cut-off grows with the zoom
+      return onScreen.filter((x) => Math.sqrt(x[0]) <= farTag).slice(0, maxTags).map((x) => x[1]);
+    }
+    function placeTags() {
+      const show = chosen.filter((h) => h.nick !== selected);
+      // a card is open: only its own nick, the rest would sit on top of the house you came to look at
+      if (selected && island.houses.has(selected)) { show.length = 0; show.push(island.houses.get(selected)); }
       const w = window.innerWidth, hgt = window.innerHeight, placed = [];
       let used = 0;
       show.forEach((h) => {
-        if (used >= maxTags + 1) return;
         v.copy(h.top).project(camera);
         if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
         const me = h.nick === selected;
         const dist = Math.sqrt(h.top.distanceToSquared(camera.position));
-        // far views still show the nearest nicks: the cut-off grows with the zoom
-        if (!me && dist > farTag) return;
         const s = me ? 1 : Math.max(0.75, Math.min(1.1, 45 / dist));
         const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * hgt;
         const bw = (h.nick.length + 1) * (me ? 9.5 : 7) * s + 18, bh = (me ? 28 : 21) * s;
@@ -787,7 +801,8 @@
     // one tap walks main island → each country island → main again, all seen from above
     let onIsle = -1;
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
-    function viewMain(dur) { const R = island.radius, tall = innerWidth < innerHeight; flyTo(V3(0, 2, 0), tall ? V3(R * 0.2, R * 1.55 + 8, R * 0.95) : V3(R * 0.9, R * 0.95 + 10, R * 1.25), dur); }
+    // a phone starts closer and steeper: the island fills the screen with houses instead of half a screen of sky
+    function viewMain(dur) { const R = island.radius, tall = innerWidth < innerHeight; flyTo(V3(0, 2, R * 0.12), tall ? V3(R * 0.12, R * 1.0 + 10, R * 0.62) : V3(R * 0.7, R * 0.8 + 10, R * 1.0), dur); }
     function viewIsle(isle) { const a = isle.at, R = isle.radius; flyTo(a.clone().add(V3(0, 2, 0)), a.clone().add(V3(R * 0.3, R * 1.3 + 10, R * 0.7))); }
     $("tIsle").onclick = () => {
       if (!isles.length) return;
