@@ -189,7 +189,7 @@ def tally_polls():
 
 
 # poll id → countries that got their own island; "winner" = the poll's top option, only once the poll has closed
-COUNTRY_ISLANDS = {"island": ["kz"], "island2": ["kg"]}  # 10.11: user settled KG voters before the close
+COUNTRY_ISLANDS = {"island": ["kz"], "island2": ["kg"], "goat": ["ronaldo"]}  # 13.11: Ronaldo fans get his stadium island
 
 
 def island_country():
