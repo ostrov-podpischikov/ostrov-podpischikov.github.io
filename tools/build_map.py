@@ -138,6 +138,23 @@ def write_atomic(path, text):
 LOCAL_LETTERS = str.maketrans({"қ": "к", "ғ": "г", "ү": "у", "ұ": "у", "ө": "о", "ң": "н", "ә": "а", "і": "и", "һ": "х", "ў": "у", "ҳ": "х", "ʻ": "", "'": "", "’": ""})
 
 
+DATE_RE = re.compile(r"(?<![\d.])(\d{1,2})\s*[./\-]\s*(\d{1,2})(?!\d)")
+
+
+def date_month(text):
+    """«14.03», «14/03/1999» → "3"; nothing when it is no real day.month."""
+    for d, m in DATE_RE.findall(text):
+        if 1 <= int(d) <= 31 and 1 <= int(m) <= 12:
+            return str(int(m))
+    return None
+
+
+def word_hit(key, word):
+    """A poll word is a prefix; "=мая" must be the whole word (so «маяк» is not May)."""
+    key = key.replace("ё", "е")
+    return word == key[1:] if key.startswith("=") else word.startswith(key)
+
+
 def tally_polls():
     """Votes from comments: an option number as a standalone number, or a word from the option.
     One vote per person — their latest comment that votes for something; a poll with "each": true counts every comment."""
@@ -168,9 +185,9 @@ def tally_polls():
             text = c.get("text", "").lower().replace("ё", "е").translate(LOCAL_LETTERS)
             words = re.findall(r"[a-zа-я]+", text)
             numbers = set(re.findall(r"(?<!\d)\d(?!\d)", text))
-            hit = next((o["key"] for o in p["options"] if o["key"] in numbers), None)
-            hit = hit or next((o["key"] for o in p["options"]
-                               if any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words)), None)
+            # "dates": true — a birthday poll: 14.03 / 14/03 votes for month 3; bare digits are days, not option numbers
+            hit = date_month(text) if p.get("dates") else next((o["key"] for o in p["options"] if o["key"] in numbers), None)
+            hit = hit or next((o["key"] for o in p["options"] if any(word_hit(k, w) for k in o.get("words", []) for w in words)), None)
             # a flag emoji (🇰🇬) counts as the option whose emoji it is
             hit = hit or (next((o["key"] for o in p["options"] if p.get("each") and o.get("emoji") and o["emoji"] in c.get("text", "")), None))
             if hit and c.get("username"):
