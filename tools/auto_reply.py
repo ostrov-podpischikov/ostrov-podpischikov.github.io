@@ -156,6 +156,9 @@ def load_state(path):
     return data
 
 
+DATE_RE = re.compile(r"(?<![\d.])(\d{1,2})\s*[./\-]\s*(\d{1,2})(?!\d)")
+
+
 def find_vote(text, polls, when):
     text = text.lower().replace("ё", "е")
     words = re.findall(r"[a-zа-я]+", text)
@@ -165,8 +168,13 @@ def find_vote(text, polls, when):
             continue
         if p.get("until") and when[:len(p["until"])] >= p["until"]:
             continue  # a closed vote: no «голос засчитан» replies
+        if p.get("dates"):  # a birthday poll: 14.03 → March; bare digits are days, not option numbers
+            for d, mo in DATE_RE.findall(text):
+                if 1 <= int(d) <= 31 and 1 <= int(mo) <= 12:
+                    return next(o["label"] for o in p["options"] if o["key"] == str(int(mo)))
         for o in p["options"]:
-            if o["key"] in numbers or any(w.startswith(k.replace("ё", "е")) for k in o.get("words", []) for w in words):
+            if (o["key"] in numbers and not p.get("dates")) or any(
+                    (w == k[1:] if k.startswith("=") else w.startswith(k)) for k in (x.replace("ё", "е") for x in o.get("words", [])) for w in words):
                 return o["label"]
     return None
 
