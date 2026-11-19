@@ -41,8 +41,9 @@ jobs:
           DM_ONLY: ${{ vars.DM_ONLY }}
           OSTROV_SITE_DATA: data
         run: |
-          # 18.11: the Meta app was deleted (OAuthException 190) - the island still rebuilds from cached comments + followers
+          # 18.11: the Meta app was deleted (OAuthException 190) - comments now come from the browser (ostrov-data/comments_web.js -> tools/comments_web.json)
           python tools/fetch_comments.py || echo "Instagram API недоступен - собираю из кэша комментов"
+          python tools/merge_web_comments.py || echo "Комменты из браузера пропущены"
           python tools/dm_follow.py || echo "Личные сообщения пропущены"
           python tools/build_map.py
 
