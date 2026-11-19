@@ -285,7 +285,7 @@
     sun.shadow.bias = -0.0015;
     sun.shadow.normalBias = 0.04; // no shadow stripes crawling over the ground while the camera moves
     scene.add(sun, sun.target);
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: "#1E9CC8" }));
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(200000, 200000), new THREE.MeshLambertMaterial({ color: "#1E9CC8" }));
     ocean.rotation.x = -Math.PI / 2;
     ocean.receiveShadow = true;
     scene.add(ocean);
@@ -448,7 +448,7 @@
         const R = island.radius;
         shadowR = R; // the shadow box itself follows the view in loop()
         controls.maxDistance = R * 4;
-        scene.fog = new THREE.Fog("#a8e0f8", R * 3, R * 7);
+        scene.fog = new THREE.Fog("#8fd6f6", R * 3, R * 7);   // the sky colour: the sea melts into it, no hard edge
         // on a phone start closer and from above, so houses fill the screen instead of the sky
         viewMain(0);
         $("tIsle").style.display = isles.length ? "" : "none";
@@ -501,10 +501,15 @@
       const now = performance.now();
       if (key !== lastView) { lastView = key; lastMove = now; picked = false; }
       else if (picked) return;
-      if (!picked && now - lastMove > 250) { chosen = pickTags(); picked = true; }
+      // a view that keeps moving (a pinch still gliding, a flight, a phone that never quite rests) still gets nicks:
+      // re-pick every 0.5 s while moving, keeping the nicks already shown where they still fit
+      const rest = now - lastMove > 250;
+      if (!picked && (rest || now - lastPick > 500)) { chosen = pickTags(chosen); lastPick = now; picked = rest; }
       placeTags();
     }
-    function pickTags() {
+    let lastPick = 0;
+    function pickTags(prev) {
+      const keep = new Set(prev || []);
       const maxTags = phone() ? 20 : 40;
       const farTag = Math.max(160, camera.position.distanceTo(controls.target) * 2.5);
       const list = [];
@@ -514,14 +519,20 @@
       // and only the part not covered by the panels; spread over a screen grid (nearest house per cell), so a far view
       // gets nicks all over the island instead of a clump at the bottom edge
       // big cells: a few nicks spread over the view instead of a cloud of them covering the houses
-      const W = innerWidth, Hh = innerHeight, cell = {}, cw = W < 600 ? 135 : 200, ch = W < 600 ? 105 : 90;
+      const W = innerWidth, Hh = innerHeight, cell = {}, close = camera.position.distanceTo(controls.target) < 70,
+        cw = W < 600 ? (close ? 110 : 135) : 200, ch = W < 600 ? (close ? 70 : 105) : 90;
       list.forEach((e) => {
         v.copy(e[1].top).project(camera);
         if (v.z > 1 || Math.abs(v.x) > 1) return;
-        const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * Hh;
-        if (sy < freeTop + 24 || sy > freeBottom - 4) return;
+        const sx = (v.x * 0.5 + 0.5) * W;
+        let sy = (-v.y * 0.5 + 0.5) * Hh;
+        // close up the point above a tall roof often sits under the top panels while the house itself is in view:
+        // keep it, its nick is pinned just under the panels
+        if (sy < freeTop + 24) { v.copy(e[1].pos).project(camera); if ((-v.y * 0.5 + 0.5) * Hh < freeTop + 30) return; sy = freeTop + 24; }
+        if (sy > freeBottom - 4) return;
         const k = Math.floor(sx / cw) + "," + Math.floor(sy / ch);
-        if (!cell[k] || cell[k][0] > e[0]) cell[k] = e;
+        const d = keep.has(e[1]) ? e[0] * 0.5 : e[0];   // a nick already on screen keeps its cell: no jumping
+        if (!cell[k] || cell[k][2] > d) cell[k] = [e[0], e[1], d];
       });
       const onScreen = Object.values(cell).sort((a, b) => a[0] - b[0]);
       // far views still show the nearest nicks: the cut-off grows with the zoom
@@ -539,7 +550,7 @@
         const me = h.nick === selected;
         const dist = Math.sqrt(h.top.distanceToSquared(camera.position));
         const s = me ? 1 : Math.max(0.75, Math.min(1.1, 45 / dist));
-        const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * hgt;
+        const x = (v.x * 0.5 + 0.5) * w, y = Math.max((-v.y * 0.5 + 0.5) * hgt, me ? 0 : freeTop + 24);
         const bw = (h.nick.length + 1) * (me ? 9.5 : 7) * s + 18, bh = (me ? 28 : 21) * s;
         const box = [x - bw / 2, y - bh, x + bw / 2, y];
         if (placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) return;
@@ -587,12 +598,17 @@
       // near plane follows the zoom: far views get a deeper near plane, so phones (coarser depth buffers) stop
       // flickering between the ground, the plots and the streets, which lie only centimetres apart
       const near = Math.min(12, Math.max(0.5, camera.position.distanceTo(controls.target) / 30));
-      if (Math.abs(near - camera.near) > 0.05) { camera.near = near; camera.updateProjectionMatrix(); }
+      // the island grew past the old fixed far plane (3000) and the sea was cut off in a band of bare sky:
+      // far plane and fog now follow the zoom and the island size, fog ends just before the far plane
+      const camD = camera.position.distanceTo(controls.target), R0 = island ? island.radius : 300;
+      const fogFar = Math.max(R0 * 4, camD * 7), far = fogFar * 1.1;
+      if (scene.fog) { scene.fog.near = Math.max(R0 * 1.5, camD * 2.5); scene.fog.far = fogFar; }
+      if (Math.abs(near - camera.near) > 0.05 || Math.abs(far - camera.far) > far * 0.1) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
       // keep the view over the island: dragging can't carry it out to the open ocean
       // with a country island the view may also sit over it, or over the strait between the two
       const t = controls.target;
       // several country islands: the strait that keeps the view closest to inside its bounds wins
-      let cx = 0, cz = 0, lim = island ? island.radius * 1.1 : 0, best = lim ? Math.hypot(t.x, t.z) / lim : 0;
+      let cx = 0, cz = 0, lim = island ? island.radius * 1.25 : 0, best = lim ? Math.hypot(t.x, t.z) / lim : 0;
       isles.forEach((isle) => {
         const a = isle.at, len = a.length(), u = Math.max(0, Math.min(1, (t.x * a.x + t.z * a.z) / (len * len)));
         const x = a.x * u, z = a.z * u;   // nearest point on the line between the two centres
