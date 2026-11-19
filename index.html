@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="island.js?v=20"></script>
+  <script src="island.js?v=21"></script>
   <style>
     :root {
       --panel: rgba(13, 24, 38, 0.92);
@@ -818,7 +818,9 @@
     let onIsle = -1;
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
     // a phone starts closer and steeper: the island fills the screen with houses instead of half a screen of sky
-    function viewMain(dur) { const R = island.radius, tall = innerWidth < innerHeight; flyTo(V3(0, 2, R * 0.12), tall ? V3(R * 0.12, R * 1.0 + 10, R * 0.62) : V3(R * 0.7, R * 0.8 + 10, R * 1.0), dur); }
+    // start close over the plaza and its first blocks: houses big enough to read, nicks on them; the whole island is a
+    // pinch away (the old whole-island start turned 14 000 houses into a carpet of dots)
+    function viewMain(dur) { const R = Math.min(island.radius, 160), tall = innerWidth < innerHeight; flyTo(V3(0, 2, R * 0.12), tall ? V3(R * 0.12, R * 0.75 + 10, R * 0.55) : V3(R * 0.55, R * 0.6 + 10, R * 0.8), dur); }
     function viewIsle(isle) { const a = isle.at, R = isle.radius; flyTo(a.clone().add(V3(0, 2, 0)), a.clone().add(V3(R * 0.3, R * 1.3 + 10, R * 0.7))); }
     $("tIsle").onclick = () => {
       if (!isles.length) return;
