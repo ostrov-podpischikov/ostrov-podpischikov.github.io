@@ -14,6 +14,11 @@
   const PLOT = 10.5;       // шаг сетки участков
   const STREET = 3.0;      // ширина улицы
   const HOUSE = 1.8;       // во сколько раз дом крупнее своей модели
+  // кварталы: каждые BLOCK рядов участков между ними идёт проспект шириной AVENUE (+ обычная улица);
+  // соседи не меняются — участки только раздвигаются по кварталам. Центральный квартал — ряды −2…2.
+  const BLOCK = 6, AVENUE = 8;
+  const blk = (i) => Math.sign(i) * Math.floor((Math.abs(i) + BLOCK / 2) / BLOCK);
+  const W = (i) => i * PLOT + blk(i) * AVENUE;   // клетка сетки → мировая координата
   const YARD = 1.75;       // вещи во дворе отодвинуты к углам участка, чтобы не влезать в дом
   const ITEM = 1.3;        // и чуть крупнее, под стать дому
   const TERRAIN = 2;       // размер колонки рельефа
@@ -745,7 +750,7 @@
     for (let k = 1; k <= (opts.emptyPlots || 0); k++) { const c = plotCell(lastNo + k); far = Math.max(far, c[2]); emptyCells.push(c); }
     // the coast: never closer than Rb (the outer plots keep their grass), bulging into capes elsewhere
     // far is in shape units: the coast follows the same outline as the town, plus a beach and a few small capes
-    const Rb = Math.max(18, (far + 0.5) * PLOT);
+    const Rb = Math.max(18, (far + 0.5) * (PLOT + AVENUE / BLOCK));
     const wave = (a) => 0.5 * Math.sin(4 * a + 1.3) + 0.3 * Math.sin(6 * a + 4.1) + 0.2 * Math.sin(11 * a + 2.2) + 0.12 * Math.sin(17 * a + 0.7);
     const coast = (a) => Rb * SHAPE(a) + 9 + Rb * 0.12 * Math.max(0, wave(a) + 0.2);
     const coastAt = (x, z) => coast(Math.atan2(z, x));
@@ -801,15 +806,30 @@
       [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, c]) => corners.add(`${i + a},${j + c}`));
     });
     segs.forEach((s) => {
-      const [i, j] = s.slice(1).split(",").map(Number);
-      const col = hash(i * 5 + (s[0] === "v" ? 1 : 7), j) < 0.5 ? C.path : C.path2;
-      if (s[0] === "v") { const x = i * PLOT - H, z = j * PLOT; if (topAt(x, z) === 2) b.box(x, 2.03, z, STREET, 0.06, PLOT, col); }
-      // a hair above the other direction, so the two never share a plane where streets cross (that flickered)
-      else { const x = i * PLOT, z = j * PLOT - H; if (topAt(x, z) === 2) b.box(x, 2.04, z, PLOT, 0.06, STREET, col); }
+      const [p, q] = s.slice(1).split(",").map(Number);
+      const i = s[0] === "v" ? p : q, j = s[0] === "v" ? q : p;   // i: across the street, j: along it
+      const col = hash(p * 5 + (s[0] === "v" ? 1 : 7), q) < 0.5 ? C.path : C.path2;
+      // a segment runs between the midpoints to its neighbours, so it also paves the avenue crossings
+      const a0 = (W(j - 1) + W(j)) / 2, a1 = (W(j) + W(j + 1)) / 2, len = a1 - a0, mid = (a0 + a1) / 2;
+      // a boundary between two blocks: one wide avenue with a green strip and lamps instead of two thin streets
+      const avenue = blk(i) !== blk(i - 1), e0 = W(i - 1) + H, e1 = W(i) - H;
+      const w = avenue ? e1 - e0 + STREET : STREET, c = avenue ? (e0 + e1) / 2 : W(i) - H;
+      if (s[0] === "v") {
+        if (topAt(c, mid) !== 2) return;
+        b.box(c, 2.03, mid, w, 0.06, len, avenue ? C.stone : col);
+        if (avenue) { b.box(c, 2.12, mid, 1.4, 0.2, len - 1.6, C.grass2); if (!lite || (j & 1)) ITEMS.lamp(b, c, 2.1, mid); }
+      } else {
+        // a hair above the other direction, so the two never share a plane where streets cross (that flickered)
+        if (topAt(mid, c) !== 2) return;
+        b.box(mid, 2.04, c, len, 0.06, w, avenue ? C.stone : col);
+        if (avenue) { b.box(mid, 2.13, c, len - 1.6, 0.2, 1.4, C.grass2); if (!lite || (j & 1)) ITEMS.lamp(b, mid, 2.1, c); }
+      }
     });
     corners.forEach((s) => {
       const [i, j] = s.split(",").map(Number);
-      const x = i * PLOT - H, z = j * PLOT - H;
+      // torches only on crossings inside a block: the avenues have their own lamps
+      if (blk(i) !== blk(i - 1) || blk(j) !== blk(j - 1)) return;
+      const x = W(i) - H, z = W(j) - H;
       if (topAt(x, z) === 2 && hash(i + 31, j - 17) < (lite ? 0.06 : 0.28)) ITEMS.torch(b, x + STREET / 2 + 0.1, 2, z + STREET / 2 + 0.1);
     });
 
@@ -817,7 +837,7 @@
     const named = [], jobs = [];
     rows.forEach((r, k) => {
       const [i, j, d] = cells[k];
-      const x = i * PLOT, z = j * PLOT, y = 2;
+      const x = W(i), z = W(j), y = 2;
       // a follower who has not commented yet: their plot is staked out and waits (drawn with the empty plots below)
       if (r.plot) {
         named.push([i, j]);
@@ -900,7 +920,7 @@
 
     // empty plots: corner stakes, a rope and a little sign — «your place is waiting»
     emptyCells.concat(named).forEach(([i, j]) => {
-      const x = i * PLOT, z = j * PLOT, y = 2, s = (PLOT - STREET) / 2 - 0.4;
+      const x = W(i), z = W(j), y = 2, s = (PLOT - STREET) / 2 - 0.4;
       b.box(x, y + 0.05, z, PLOT - STREET - 0.4, 0.1, PLOT - STREET - 0.4, C.sand2);
       [[-s, -s], [s, -s], [s, s], [-s, s]].forEach(([a, c]) => b.box(x + a, y + 0.45, z + c, 0.18, 0.9, 0.18, C.log));
       // ropes thick enough to stay a solid line on a phone instead of shimmering
@@ -918,8 +938,8 @@
       const im = new THREE.InstancedMesh(plateGeo, new THREE.MeshBasicMaterial({ map: tex }), cells.length * 2);
       const m = new THREE.Matrix4(), flip = new THREE.Matrix4().makeRotationY(Math.PI);
       cells.forEach(([i, j], k) => {
-        im.setMatrixAt(k * 2, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.68));
-        im.setMatrixAt(k * 2 + 1, m.makeTranslation(i * PLOT, 4.0, j * PLOT + 0.56).multiply(flip));
+        im.setMatrixAt(k * 2, m.makeTranslation(W(i), 4.0, W(j) + 0.68));
+        im.setMatrixAt(k * 2 + 1, m.makeTranslation(W(i), 4.0, W(j) + 0.56).multiply(flip));
       });
       im.instanceMatrix.needsUpdate = true;
       im.frustumCulled = false;   // three 0.147 culls instances by the one plane's bounds at the origin
@@ -943,7 +963,7 @@
     // empty cells: palms, flowers, rocks; beach palms around the edge
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
       if (occupied.has(i + "," + j)) continue;
-      const x = i * PLOT, z = j * PLOT, d = Math.hypot(x, z);
+      const x = W(i), z = W(j), d = Math.hypot(x, z);
       if (d > coastAt(x, z) - 2) continue;
       const h = hash(i + 7, j - 3), top = topAt(x, z);
       if (!top) continue;
@@ -1017,7 +1037,7 @@
       port = { pos: at.clone().add(new THREE.Vector3(22, 2, 6)) };
     }
 
-    const empty = emptyCells.map(([i, j]) => new THREE.Vector3(i * PLOT, 2, j * PLOT));
+    const empty = emptyCells.map(([i, j]) => new THREE.Vector3(W(i), 2, W(j)));
     return { group, houses, empty, radius: R, plaza: new THREE.Vector3(0, 2, 0), pier: new THREE.Vector3(3.5, 1, pz + 5), sign, levels: LEVELS, lighthouse, port, flagPole, step, jobs: jobs.length };
   }
 
@@ -1221,5 +1241,5 @@
     return { group: g, beam, pos: at.clone(), top: at.clone().add(new THREE.Vector3(0, y + 3.5, 0)) };
   }
 
-  root.OstrovIsland = { build, plotCell, look, LEVELS, MAX_LEVEL, FEATURES, PLOT, BIZ };
+  root.OstrovIsland = { build, plotCell, look, LEVELS, MAX_LEVEL, FEATURES, PLOT, BIZ, W };
 })(typeof window !== "undefined" ? window : globalThis);
