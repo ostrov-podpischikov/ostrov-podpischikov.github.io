@@ -10,6 +10,21 @@
   "follower_points": 3,
   "options": [
    {
+    "key": "kg",
+    "label": "Кыргызстан",
+    "emoji": "🇰🇬",
+    "words": [
+     "кыргыз",
+     "киргиз",
+     "кыргзс",
+     "kyrgyz",
+     "кр",
+     "кыргз",
+     "qyrgyz",
+     "kirgiz"
+    ]
+   },
+   {
     "key": "uz",
     "label": "Узбекистан",
     "emoji": "🇺🇿",
